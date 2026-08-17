@@ -37,6 +37,9 @@ Devon 当前 prompt、schedule、trigger 与角色说明的离线副本。
 ### `../vendor/ci-workflows/report.yml`
 共享回写 workflow 的当前归档拷贝。
 
+### `LIVE-READBACK-LEDGER.md`
+这些真抄本最后一次和真身对上的时间账本。
+
 > 注意：这些都是**抄本**。它们能证明“上次有人这样导出过”，不能证明真身此刻还是这样。
 
 ---
@@ -48,6 +51,9 @@ Devon 当前 prompt、schedule、trigger 与角色说明的离线副本。
 
 ### `RESTORE-DRILL-TEMPLATE.md`
 以后真的做过一次恢复演练时，应该怎么记账。
+
+### `RESTORE-DRILL-0001.md`
+第一条真实恢复演练记录：这份备份仓自身结构可以重建什么，哪些仍然是 blind spot。
 
 ---
 
@@ -65,6 +71,9 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 ### `DEPENDENCIES.md`
 这份备份真正依赖哪些仓外真身、权限、时序和手动动作。
 
+### `CHANGELOG-BOOTSTRAP.md`
+这份离线备份仓是怎么一层层长起来的，不让“这些文件好像一直都在”变成错觉。
+
 ---
 
 ## 5. 仓库自校验
@@ -80,7 +89,19 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 
 ---
 
-## 6. 先看哪一份
+## 6. 证据链
+
+### `VERIFY-EVIDENCE-0001.md`
+第一条 live CI 绿灯证据：最小闸门真的跑过一次，而且是绿的。
+
+### `VERIFY-EVIDENCE-0002.md`
+第一条负向证明：故意把 `not_backed_up` 清空，闸门按预期变红，再修回去后恢复成绿。
+
+> 这两页合在一起，才第一次证明最小闸门不只会亮绿灯，也会在最值钱的地方真的喊。
+
+---
+
+## 7. 先看哪一份
 
 ### 如果你第一次进这个仓库
 先看：
@@ -92,19 +113,29 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 先看：
 1. `RECOVERY.md`
 2. `RESTORE-DRILL-TEMPLATE.md`
-3. 真抄本（agents / vendor）
+3. `RESTORE-DRILL-0001.md`
+4. 真抄本（agents / vendor）
 
 ### 如果你想知道这套东西以前怎么坏过
 先看：
 1. `INCIDENT-LEDGER.md`
 2. `BLIND-SPOTS.md`
 3. `OBSERVERS.md`
+4. `CHANGELOG-BOOTSTRAP.md`
 
 ### 如果你只想确认这份仓库自己是不是还诚实
 先看：
 1. `manifest.json`
 2. `verify.py`
 3. `.github/workflows/verify.yml`
+4. `VERIFY-EVIDENCE-0001.md`
+5. `VERIFY-EVIDENCE-0002.md`
+
+### 如果你想确认这份仓库不是摆设
+先看：
+1. `verify.py`
+2. `VERIFY-EVIDENCE-0001.md`
+3. `VERIFY-EVIDENCE-0002.md`
 
 ---
 
