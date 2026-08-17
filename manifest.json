@@ -5,7 +5,13 @@
     "Recovery guide",
     "Blind spots ledger"
   ],
-  "not_backed_up": [],
+  "not_backed_up": [
+    "Live ClickUp skill bodies unless explicitly exported into this repo",
+    "Live Super Agent prompts unless explicitly exported into this repo",
+    "Shared workflow source-of-truth repo contents unless explicitly mirrored here",
+    "Proof that any skill auto-triggered by summary",
+    "ClickUp UI-only fields and labels"
+  ],
   "invariants": {
     "agents_and_claude_match": true,
     "recovery_doc_exists": true,
