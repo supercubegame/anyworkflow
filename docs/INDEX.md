@@ -49,6 +49,9 @@ Devon 当前 prompt、schedule、trigger 与角色说明的离线副本。
 ### `RECOVERY.md`
 恢复顺序：从 repo、workflow、prompt、shared writeback 到 live readback。
 
+### `RECOVERY-CHECKLIST.md`
+恢复时可以逐项打勾的清单，不用临场回忆。
+
 ### `RESTORE-DRILL-TEMPLATE.md`
 以后真的做过一次恢复演练时，应该怎么记账。
 
@@ -84,6 +87,9 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 ### `../verify.py`
 最小闸门：守最基本的诚实，不让这份备份仓自己安静地说谎。
 
+### `MINIMAL-GATE.md`
+解释这条最小闸门**守什么、不守什么、为什么故意只守这么少**。这页是理解 `verify.py` 的入口，不是附属品。
+
 ### `../.github/workflows/verify.yml`
 把这条最小闸门接进 CI。
 
@@ -112,9 +118,10 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 ### 如果你要恢复这套东西
 先看：
 1. `RECOVERY.md`
-2. `RESTORE-DRILL-TEMPLATE.md`
-3. `RESTORE-DRILL-0001.md`
-4. 真抄本（agents / vendor）
+2. `RECOVERY-CHECKLIST.md`
+3. `RESTORE-DRILL-TEMPLATE.md`
+4. `RESTORE-DRILL-0001.md`
+5. 真抄本（agents / vendor）
 
 ### 如果你想知道这套东西以前怎么坏过
 先看：
@@ -126,16 +133,18 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 ### 如果你只想确认这份仓库自己是不是还诚实
 先看：
 1. `manifest.json`
-2. `verify.py`
-3. `.github/workflows/verify.yml`
-4. `VERIFY-EVIDENCE-0001.md`
-5. `VERIFY-EVIDENCE-0002.md`
+2. `MINIMAL-GATE.md`
+3. `verify.py`
+4. `.github/workflows/verify.yml`
+5. `VERIFY-EVIDENCE-0001.md`
+6. `VERIFY-EVIDENCE-0002.md`
 
 ### 如果你想确认这份仓库不是摆设
 先看：
-1. `verify.py`
-2. `VERIFY-EVIDENCE-0001.md`
-3. `VERIFY-EVIDENCE-0002.md`
+1. `MINIMAL-GATE.md`
+2. `verify.py`
+3. `VERIFY-EVIDENCE-0001.md`
+4. `VERIFY-EVIDENCE-0002.md`
 
 ---
 
