@@ -8,19 +8,9 @@
 
 <p align="center"><a href="./README.md">English</a> | 简体中文</p>
 
-<p align="center">
-  <a href="./docs/BOOTSTRAP-FROM-ZERO.md">Tutorial</a>
-  ·
-  <a href="./docs/PROMPT-EXAMPLES.md">Examples</a>
-  ·
-  <a href="./docs/RECOVERY.md">Recovery</a>
-  ·
-  <a href="./docs/MINIMAL-GATE.md">Verification</a>
-</p>
-
 ---
 
-## Quick Install
+## 快速开始
 
 如果你想用最短路径，从零搭出第一版可运行闭环，按这个顺序做：
 
@@ -37,25 +27,27 @@
 8. 给真抄本记下 live readback 时间。
 9. 最后把整套东西回写进像本仓这样的离线备份仓。
 
-完整路径看：[`docs/BOOTSTRAP-FROM-ZERO.md`](./docs/BOOTSTRAP-FROM-ZERO.md)
+如果你要走完整路径，直接看：
+- [`docs/BOOTSTRAP-FROM-ZERO.md`](./docs/BOOTSTRAP-FROM-ZERO.md)
+- [`docs/SETUP-CHECKLIST.md`](./docs/SETUP-CHECKLIST.md)
+- [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
 ---
 
-## What You Get
+## 你会得到什么
 
-这份仓库是一个 Agent-first 交付工作流的**离线、可审计副本**。
-
-它保留的是：
-- 这套工作流怎么运作
-- 它依赖什么
-- 哪些地方已经有证据
-- 哪些地方仍然只能靠人工或仓外补证
+这份仓库给你的不是 live 系统本身，而是：
+- 一份离线、可审计的 workflow 抄本
+- 完整的 setup / recovery 文档
+- 关键 prompt 与 shared workflow 的真抄本归档
+- green 与 red -> green 两层证据
+- 一张明确写清“哪些还不能只靠仓内证明”的边界清单
 
 它**不假装**自己就是 live 系统。
 
 ---
 
-## Example Prompts
+## 示例提示词
 
 你可以用这些提示词测试一个新对话会不会自然走进这套工作流：
 
@@ -63,11 +55,11 @@
 - “做个简单网页工具，功能别花哨，但要自己把交付质量关好。”
 - “做个 Chrome 扩展原型，先把质量和验证链条搭好，再做功能。”
 
-完整示例看：[`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
+更多见：[`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
 ---
 
-## Tutorial
+## 教程
 
 如果你今天要从零开始，按这个顺序读：
 
@@ -78,17 +70,17 @@
 
 ---
 
-## Verification
+## 如何验证它不是摆设
 
 这份仓库现在已经有三层不同强度的证据：
 
-### 1. 结构证据
+### 结构证据
 文件、台账、规则都在。
 
-### 2. 正向证据
+### 正向证据
 [`docs/VERIFY-EVIDENCE-0001.md`](./docs/VERIFY-EVIDENCE-0001.md) 证明最小闸门真的在 live CI 里跑绿过一次。
 
-### 3. 负向证据
+### 负向证据
 [`docs/VERIFY-EVIDENCE-0002.md`](./docs/VERIFY-EVIDENCE-0002.md) 证明最小闸门真的会对有意义的坏输入亮红灯，修回去后再恢复绿。
 
 最小闸门本体是 `python3 verify.py`。
@@ -98,7 +90,7 @@
 
 ---
 
-## Known Limits
+## 当前边界
 
 这份仓库**没有装作**自己能证明一切。
 
@@ -113,7 +105,7 @@
 
 ---
 
-## Recovery
+## 恢复
 
 如果你是拿这份仓库来恢复整套系统，从这里开始：
 
@@ -124,7 +116,7 @@
 
 ---
 
-## Deeper Docs
+## 深入文档
 
 - 工作流总览：[`docs/FULL-WORKFLOW.md`](./docs/FULL-WORKFLOW.md)
 - 离线备份方案：[`docs/OFFLINE-BACKUP-SCHEME.md`](./docs/OFFLINE-BACKUP-SCHEME.md)
@@ -137,8 +129,6 @@
 
 ---
 
-## 一句话总结
+## 一句话说明
 
-这份仓库真正防的不是丢文件，而是：
-
-> **文件都还在，但系统已经开始安静地说谎。**
+一份可读、可审计的 Agent 验证工作流离线备份。

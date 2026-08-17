@@ -8,21 +8,11 @@
 
 <p align="center">English | <a href="./README_CN.md">简体中文</a></p>
 
-<p align="center">
-  <a href="./docs/BOOTSTRAP-FROM-ZERO.md">Tutorial</a>
-  ·
-  <a href="./docs/PROMPT-EXAMPLES.md">Examples</a>
-  ·
-  <a href="./docs/RECOVERY.md">Recovery</a>
-  ·
-  <a href="./docs/MINIMAL-GATE.md">Verification</a>
-</p>
-
 ---
 
 ## Quick Install
 
-If you want the shortest path from zero to a first working version, do this:
+Start here if you want the fastest path from zero to a first working version:
 
 1. Create three repos:
    - a shared writeback repo
@@ -37,19 +27,21 @@ If you want the shortest path from zero to a first working version, do this:
 8. Capture live readback timestamps for the true copies.
 9. Back the whole thing up into a repo like this one.
 
-Full path: [`docs/BOOTSTRAP-FROM-ZERO.md`](./docs/BOOTSTRAP-FROM-ZERO.md)
+Need the full path? Go to:
+- [`docs/BOOTSTRAP-FROM-ZERO.md`](./docs/BOOTSTRAP-FROM-ZERO.md)
+- [`docs/SETUP-CHECKLIST.md`](./docs/SETUP-CHECKLIST.md)
+- [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
 ---
 
 ## What You Get
 
-This repo is the offline, auditable copy of an agent-first delivery workflow.
-
-It preserves:
-- how the workflow runs
-- what it depends on
-- which parts are backed by evidence
-- which parts still need human or external proof
+This repo gives you:
+- an offline, auditable copy of the workflow
+- setup and recovery docs
+- true-copy archives for key prompts and shared workflow logic
+- green and red -> green proof records
+- a clear list of what still needs human or external proof
 
 It does **not** pretend to be the live system.
 
@@ -63,7 +55,7 @@ Use these to test whether a fresh conversation naturally enters the workflow:
 - “Build a simple web tool. Keep the feature small, but keep the delivery quality high.”
 - “Build a Chrome extension prototype. Set up the quality and verification chain first, then add features.”
 
-Full set: [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
+More: [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
 ---
 
@@ -82,13 +74,13 @@ If you are starting from zero, read these in order:
 
 This repo already contains three proof layers:
 
-### 1. Structure proof
+### Structure proof
 The files, ledgers, and rules exist.
 
-### 2. Green proof
+### Green proof
 [`docs/VERIFY-EVIDENCE-0001.md`](./docs/VERIFY-EVIDENCE-0001.md) proves the minimal gate really ran green in live CI.
 
-### 3. Red -> green proof
+### Red -> green proof
 [`docs/VERIFY-EVIDENCE-0002.md`](./docs/VERIFY-EVIDENCE-0002.md) proves the minimal gate really goes red on a meaningful bad input, then returns green when fixed.
 
 The minimal gate itself is `python3 verify.py`.
@@ -99,8 +91,6 @@ What it guards, and what it deliberately does **not** guard, is documented in:
 ---
 
 ## Known Limits
-
-This repo does **not** pretend to prove everything.
 
 Still outside direct repo proof:
 - whether a skill auto-triggered by summary
@@ -137,8 +127,6 @@ If you are using this repo to rebuild the workflow, start here:
 
 ---
 
-## One-line Summary
+## Summary
 
-This repo is here to stop one specific failure mode:
-
-> **The files still exist, but the system has already started lying quietly.**
+A readable, auditable backup of an agent-first verification workflow.
