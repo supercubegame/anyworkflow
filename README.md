@@ -27,22 +27,28 @@
 
 明确分开。
 
-## 先回答三个最常见的问题
+## 这份 README 怎么用
 
-### 1. 这套东西怎么运作
+### 如果你是第一次来
 先看：
 1. `docs/FULL-WORKFLOW.md`
 2. `docs/OFFLINE-BACKUP-SCHEME.md`
 3. `docs/DEPENDENCIES.md`
 
-### 2. 如果今天要恢复它，先看什么
+### 如果你今天要从零把这套东西跑起来
+先看：
+1. `docs/BOOTSTRAP-FROM-ZERO.md`
+2. `docs/SETUP-CHECKLIST.md`
+3. `docs/PROMPT-EXAMPLES.md`
+
+### 如果你今天要恢复它
 先看：
 1. `docs/RECOVERY.md`
 2. `docs/RECOVERY-CHECKLIST.md`
 3. `docs/RESTORE-DRILL-TEMPLATE.md`
 4. `docs/RESTORE-DRILL-0001.md`
 
-### 3. 怎么确认这份仓库不是摆设
+### 如果你只想确认这份仓库不是摆设
 先看：
 1. `docs/MINIMAL-GATE.md`
 2. `verify.py`
@@ -52,6 +58,7 @@
 ## 这里已经备份了什么
 - Agent 自验证流水线的方法论
 - GitHub MCP + ClickUp Skills 的闭环结构
+- 从零跑通的安装 / 导入 / 运行手册
 - 观察者分工（Quinn / Devon）
 - 回写、心跳、台账、恢复步骤、事故台账、依赖台账
 - 共享 writeback workflow 的当前归档拷贝
@@ -89,15 +96,15 @@
 
 没有这三层，离线备份很容易退化成一个看起来很整齐的文件夹。
 
-## 索引
-完整索引在：`docs/INDEX.md`
-
-如果你不想猜“现在该先看哪一份”，直接从那一页开始。
-
 ## 品牌与图形
 - 当前 logo：`assets/logo-1080.png`
 - README 顶部头图：`assets/hero-banner.png`
 - 使用说明：`docs/BRAND.md`
+
+## 索引
+完整索引在：`docs/INDEX.md`
+
+如果你不想猜“现在该先看哪一份”，直接从那一页开始。
 
 ## 一句话总结
 
