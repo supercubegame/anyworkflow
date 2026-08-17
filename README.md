@@ -5,7 +5,8 @@
 <h1 align="center">anyworkflow</h1>
 
 <p align="center"><strong>Agent workflow for building, verifying, and shipping software with evidence.</strong></p>
-<p align="center"><strong>用证据驱动构建、验证与交付的 Agent 工作流。</strong></p>
+
+<p align="center">English | <a href="./README_CN.md">简体中文</a></p>
 
 <p align="center">
   <a href="./docs/BOOTSTRAP-FROM-ZERO.md">Tutorial</a>
@@ -58,9 +59,9 @@ It does **not** pretend to be the live system.
 
 Use these to test whether a fresh conversation naturally enters the workflow:
 
-- “做个 2D 小游戏，自己把质量关好，我不想手动帮你验。”
-- “做个简单网页工具，功能别花哨，但要自己把交付质量关好。”
-- “做个 Chrome 扩展原型，先把质量和验证链条搭好，再做功能。”
+- “Build a 2D game and keep the quality bar yourself. I don’t want to hand-test it.”
+- “Build a simple web tool. Keep the feature small, but keep the delivery quality high.”
+- “Build a Chrome extension prototype. Set up the quality and verification chain first, then add features.”
 
 Full set: [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
@@ -97,7 +98,7 @@ What it guards, and what it deliberately does **not** guard, is documented in:
 
 ---
 
-## Limits
+## Known Limits
 
 This repo does **not** pretend to prove everything.
 
