@@ -1,0 +1,21 @@
+{
+  "purpose": "Offline backup of the Agent self-verification workflow itself: skills, prompts, workflow ledgers, recovery notes, and known blind spots.",
+  "backed_up": [
+    "AGENTS.md / CLAUDE.md rules copy",
+    "Recovery guide",
+    "Blind spots ledger"
+  ],
+  "not_backed_up": [
+    "Live ClickUp skill bodies unless explicitly exported into this repo",
+    "Live Super Agent prompts unless explicitly exported into this repo",
+    "Shared workflow source-of-truth repo contents unless explicitly mirrored here",
+    "Proof that any skill auto-triggered by summary",
+    "ClickUp UI-only fields and labels"
+  ],
+  "invariants": {
+    "agents_and_claude_match": true,
+    "recovery_doc_exists": true,
+    "blind_spots_doc_exists": true,
+    "not_backed_up_must_be_nonempty": true
+  }
+}
