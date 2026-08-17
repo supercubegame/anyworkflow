@@ -1,3 +1,5 @@
+# <img src="./assets/logo-1080.png" alt="anyworkflow logo" width="108" />
+
 # anyworkflow
 
 离线备份仓：不是备份某一个项目，而是备份**这套工作流本身**。
@@ -85,6 +87,12 @@
 完整索引在：`docs/INDEX.md`
 
 如果你不想猜“现在该先看哪一份”，直接从那一页开始。
+
+---
+
+## 品牌与图形
+- 当前 logo：`assets/logo-1080.png`
+- 使用说明：`docs/BRAND.md`
 
 ---
 
