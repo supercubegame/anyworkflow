@@ -1,19 +1,40 @@
-# 观察者当前 prompt 模型（摘要版）
+# Observer Prompt Index
 
-## Quinn
-- 每天横向巡检
-- 看跨仓 truth、上游 drift、heartbeat、台账真假
-- 真值在别处时，优先读真文件，不复述抄本
-- 对沉默通道更敏感：回写、主干、定时、上游 main
+这份文件不再复述 prompt 内容本身，只负责做**摘要层索引**。
 
-## Devon
-- 第二只眼，不是第二个喇叭
-- 只在两种情况下开口：
-  1. 它看到的和 Quinn 不一样
-  2. 它拿到的是比 Quinn 更硬的证据
-- 默认不报健康播报，不复读 Quinn
-- 只盯备份新鲜度、演练新鲜度、heartbeat 是否过窗、承重 agent 抄本是否快过期
+原因很简单：仓里已经有两份真抄本全文：
+- `agents/gate-audit-quinn.md`
+- `agents/drift-devon.md`
 
-## 为什么这里只放摘要，不放全文
-完整 prompt 仍然应该从 live ClickUp 真身读回并导出。这里先放的是“当前分工模型”，
-防止以后只剩下日程名字和一份过期印象。
+如果这里继续保留“prompt 摘要版”，就会形成第三层叙述：
+- `docs/OBSERVERS.md` 讲职责分工
+- `docs/OBSERVER-PROMPTS.md` 讲 prompt 摘要
+- `agents/*.md` 存 prompt 全文
+
+这三层里，最容易漂的是中间那层摘要。它会制造一种很讨厌的坏法：
+
+> 全文改了，摘要没改；或者摘要改了，全文没动。
+
+所以现在这份文件只保留两件事：
+
+## 1. 全文抄本入口
+- Quinn 全文：`agents/gate-audit-quinn.md`
+- Devon 全文：`agents/drift-devon.md`
+
+## 2. 分工说明入口
+- 职责分工与不该互相复读：`docs/OBSERVERS.md`
+- 真抄本最后一次读回时间：`docs/LIVE-READBACK-LEDGER.md`
+
+## 这份文件不再承担什么
+- 不再承担 prompt 内容摘要
+- 不再承担 schedule / trigger 的二次转述
+- 不再承担“谁该说什么”的解释正文
+
+那些都应该各回各家：
+- 全文回 `agents/*.md`
+- 分工回 `OBSERVERS.md`
+- 时间回 `LIVE-READBACK-LEDGER.md`
+
+## 一句话总结
+
+> 这页现在只做导航，不再做第三份 prompt 描述源。
