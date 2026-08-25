@@ -7,7 +7,7 @@
 # 从外面看仓库依然是「跑过了」。这个脚本回头去 API 上确认：**这一次运行**贴出来
 # 的那条评论真的存在。
 #
-# 共享回写 workflow 内部已经有「发完读回」，但那是监控自证清白。这里是从外面
+# 共享回写 workflow 内部已经有「发完读回来」，但那是监控自证清白。这里是从外面
 # 看，看的和读评论的人拿到的是同一份东西。
 #
 # 五个设计点，每一个都是为了不让它变成空断言：
@@ -21,7 +21,7 @@
 #    读成成功。
 # 4. **轮询，不睡一觉。** 判据是布尔，不是计数。
 # 5. **自证。** 下面那套离线用例每次都先跑：同一个检查器在合成的好样本上必须
-#    0 问题，在七个坏样本上必须各自判红。尺子坏了就 exit 2，而那和「送达失败」
+#    0 问题，在八个坏样本上必须各自判红。尺子坏了就 exit 2，而那和「送达失败」
 #    是两件不同的事。
 #
 # marker 从 manifest.json 读（那是真源，也是这里成为「真取用点」的原因）。
@@ -42,6 +42,8 @@ COMPOSER_SENTINEL = '<!-- anyworkflow-composer-ran -->'
 DEGRADED_PHRASE = '报告降级'
 POLL_ATTEMPTS = 8
 POLL_SLEEP_SECONDS = 5
+# 数字不手写：由 selftest() 里那张表算出来。散文里手写的条数注定漂，而漂了不会有任何动静。
+SELFTEST_CASE_COUNT = 0
 
 
 def hits(comments, marker):
@@ -119,6 +121,8 @@ def selftest():
         ('没有哨兵必须红', ([], [{'body': good_body.replace(COMPOSER_SENTINEL, '')}], None), 1),
         ('查找器乱匹配必须红', ([], [{'body': good_body + marker + f':attest-selftest-nonexistent:{run_id}'}], None), 1),
     ]
+    global SELFTEST_CASE_COUNT
+    SELFTEST_CASE_COUNT = len(cases)
     broken = []
     for title, (prc, cc, _), want_min in cases:
         problems, _ = evaluate(marker, sha, run_id, None, prc, cc)
@@ -148,7 +152,7 @@ def main():
     if broken:
         print('\n检查器自己的离线用例没过 —— 尺子坏了，这次什么都没验到（不是绿）。')
         return 2
-    print(f'  · 检查器离线自证通过（9 个合成样本，好的绿、坏的各自红）')
+    print(f'  · 检查器离线自证通过（{SELFTEST_CASE_COUNT} 个合成样本，好的绿、坏的各自红）')
 
     marker = ((json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8')).get('writeback')) or {}).get('marker')
     token = os.environ.get('GH_TOKEN')
