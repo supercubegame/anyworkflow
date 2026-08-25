@@ -76,6 +76,12 @@ jobs:
   #
   # marker 这一行是耦合参数,真源在 manifest.json 的 writeback.marker，
   # attest 从那里读，闸门断言这一行等于那里。改一处忘了另一处，两个方向都红。
+  #
+  # **这两条断言已经在 live CI 里各自红过一次**（run 32911142277），而那一轮还顺手
+  # 证明了一件更重要的事：改歪 marker 之后，回写依然贴出了评论，但贴在新 marker
+  # 下；而 attest 按 manifest 去找，找到的是上一轮那条陈旧评论（写着「10つ10 全部
+  # 通过」）。**只断言「带 marker 的评论存在」的话，那一轮会变绿。** 详见
+  # docs/VERIFY-EVIDENCE-0003.md。
   # ==========================================================================
   report:
     name: 回报结果
@@ -90,11 +96,12 @@ jobs:
       gates: '[{"name":"备份仓闸门","result":"${{ needs.backup-repo-gate.result }}"}]'
       composer-files: scripts/compose-report.mjs
       composer-entry: scripts/compose-report.mjs
-      marker: '<!-- anyworkflow-verify-x -->'
+      marker: '<!-- anyworkflow-verify -->'
 
   # ==========================================================================
   # 送达核对。**always() 是必须的**：闸门红的那次同样要证明结论送出去了 ——
   # README 的 Quick Install 第 8 步要求别人做这件事，而这仓自己一直做不到。
+  # 这一条已经实测过（run 32908614769：闸门 failure、回写 failure、attest success）。
   #
   # 它故意不占用产物名与日志名那两个命名空间：占用会让「集合相等」类断言红在
   # 命名上，而那是假红。
