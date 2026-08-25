@@ -12,10 +12,17 @@
     "Proof that any skill auto-triggered by summary",
     "ClickUp UI-only fields and labels"
   ],
+  "writeback": {
+    "marker": "<!-- anyworkflow-verify -->",
+    "upstream_ref": "main",
+    "_marker": "这个值是一组耦合参数的真源：.github/workflows/verify.yml 传给共享回写 workflow 的 marker，和 scripts/attest_delivery.py 回头去找的那个 marker，必须逐字相同。attest 从这里读（真取用点），闸门断言 workflow 里那一行等于这里，所以改一处忘了另一处会红。",
+    "_upstream_ref": "共享回写 workflow 跟随上游主干（report.yml@main），和生态里其它消费者保持同一套策略。代价是上游改一行这边行为就变而闸门不会红，落点在外部观察者，不在本仓断言。"
+  },
   "invariants": {
     "agents_and_claude_match": true,
     "recovery_doc_exists": true,
     "blind_spots_doc_exists": true,
-    "not_backed_up_must_be_nonempty": true
+    "not_backed_up_must_be_nonempty": true,
+    "writeback_marker_matches_workflow": true
   }
 }
