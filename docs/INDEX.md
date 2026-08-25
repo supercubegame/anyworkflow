@@ -16,7 +16,7 @@
 整套工作流从需求到闸门、回写、观察者的闭环说明。
 
 ### `OFFLINE-BACKUP-SCHEME.md`
-离线备份方案四层结构：真身、抄本、台账、外部观察者。
+离线备份方案四层结构：真身、拄本、台账、外部观察者。
 
 ### `FULL-WORKFLOW-FIGURE.md`
 “完整工作流程示意图”的文字版图说。
@@ -26,7 +26,7 @@
 
 ---
 
-## 2. 真抄本
+## 2. 真拄本
 
 ### `../agents/gate-audit-quinn.md`
 Quinn 当前 prompt、schedule、trigger 与角色说明的离线副本。
@@ -38,9 +38,11 @@ Devon 当前 prompt、schedule、trigger 与角色说明的离线副本。
 共享回写 workflow 的当前归档拷贝。
 
 ### `LIVE-READBACK-LEDGER.md`
-这些真抄本最后一次和真身对上的时间账本。
+这些真拄本最后一次和真身对上的时间账本。
 
-> 注意：这些都是**抄本**。它们能证明“上次有人这样导出过”，不能证明真身此刻还是这样。
+> 注意：这些都是**拄本**。它们能证明“上次有人这样导出过”，不能证明真身此刻还是这样。
+>
+> 而且它们目前**在最小闸门的视野之外**（见 `MINIMAL-GATE.md` 的“不守 6”）：可以被清成空壳而闸门全绿。那是一笔明写的欠账。
 
 ---
 
@@ -50,7 +52,7 @@ Devon 当前 prompt、schedule、trigger 与角色说明的离线副本。
 恢复顺序：从 repo、workflow、prompt、shared writeback 到 live readback。
 
 ### `RECOVERY-CHECKLIST.md`
-恢复时可以逐项打勾的清单，不用临场回忆。
+恢复时可以逐项打钩的清单，不用临场回忆。
 
 ### `RESTORE-DRILL-TEMPLATE.md`
 以后真的做过一次恢复演练时，应该怎么记账。
@@ -82,16 +84,22 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 ## 5. 仓库自校验
 
 ### `../manifest.json`
-这份备份仓自己已经备了什么、没备什么、哪些字段必须非空。
+这份备份仓自己已经备了什么、没备什么、哪些字段必须非空,以及 `writeback` 一节：回写 marker 的真源。
 
 ### `../verify.py`
-最小闸门：守最基本的诚实，不让这份备份仓自己安静地说谎。
+最小闸门：守最基本的诚实，不让这份备份仓自己安静地说谁。
 
 ### `MINIMAL-GATE.md`
-解释这条最小闸门**守什么、不守什么、为什么故意只守这么少**。这页是理解 `verify.py` 的入口，不是附属品。
+解释这条最小闸门**守什么、不守什么、为什么故意只守这么少**，以及它上面那两层（回写、送达核对）各自负责什么。这页是理解 `verify.py` 的入口，不是附属品。
 
 ### `../.github/workflows/verify.yml`
-把这条最小闸门接进 CI。
+把三层接进 CI：闸门 → 回写 → 送达核对。
+
+### `../scripts/compose-report.mjs`
+把闸门的逐项结果合成一条评论。共享回写 workflow 以 `node <entry> reports` 调它,这仓唯一的 JavaScript，那是跨仓契约不是选择。
+
+### `../scripts/attest_delivery.py`
+回头去 API 上确认**这一次**那条评论真的存在。它带九个合成样本的离线自证，尺子坏了会 `exit 2`,而那不是绿。
 
 ---
 
@@ -104,6 +112,9 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 第一条负向证明：故意把 `not_backed_up` 清空，闸门按预期变红，再修回去后恢复成绿。
 
 > 这两页合在一起，才第一次证明最小闸门不只会亮绿灯，也会在最值钱的地方真的喊。
+
+### 还欠一条：送达证据
+回写与 attest 是刚接上的。**在真的观察过一次运行之前，这里不该有页。** 观察到之后补 `VERIFY-EVIDENCE-0003`，写实测值，不写“预期”。
 
 ---
 
@@ -121,7 +132,7 @@ Quinn / Devon 的职责分工与为什么不能互相复读。
 2. `RECOVERY-CHECKLIST.md`
 3. `RESTORE-DRILL-TEMPLATE.md`
 4. `RESTORE-DRILL-0001.md`
-5. 真抄本（agents / vendor）
+5. 真拄本（agents / vendor）
 
 ### 如果你想知道这套东西以前怎么坏过
 先看：
