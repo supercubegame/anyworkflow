@@ -79,7 +79,7 @@ def evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments):
             + ' 这正是「闸门全绿却一条评论都没有」的那种失败。')
     if other:
         problems.append(f'评论同时出现在了另一条路上（{"commit" if channel == "pr" else "PR"} 有 '
-                        f'{len(other)} 条）—— 分岘逻辑选错了地方，读 {channel} 的人看不到它')
+                        f'{len(other)} 条）—— 分岔逻辑选错了地方，读 {channel} 的人看不到它')
     if len(hit) > 1:
         problems.append(f'带这个标记的评论有 {len(hit)} 条，应该只有 1 条 —— 回写没有更新已有那条，'
                         '而是又贴了一条。刷屏也是一种坏掉，而且是看起来还在工作的那种')
