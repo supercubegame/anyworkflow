@@ -34,7 +34,7 @@
     "docs/BLIND-SPOTS.md": "ec171da31854cfe38e4711398888265574436e5b",
     "docs/BOOTSTRAP-FROM-ZERO.md": "725d55fe409757d0ecc6d70078e2763d16ede486",
     "docs/BRAND.md": "9cdfcb0f009837e7c5b827247742477f8b2f0540",
-    "docs/CHANGELOG-BOOTSTRAP.md": "81272e4fc43c338ffc7d932b2209c5f6e341e80b",
+    "docs/CHANGELOG-BOOTSTRAP.md": "2e4b5de450d23597bace67b2016373d52456cf55",
     "docs/DEPENDENCIES.md": "4a3772baa1ff62db2d068a447f3e20ac807295c4",
     "docs/FULL-WORKFLOW-FIGURE.md": "62b1eff4e7d45fd6506d45432177030c7e154afa",
     "docs/FULL-WORKFLOW.md": "3e25354643ba42288569207b3e8c48b550382916",
@@ -66,7 +66,6 @@
       ".github/workflows/verify.yml",
       "AGENTS.md",
       "CLAUDE.md",
-      "docs/CHANGELOG-BOOTSTRAP.md",
       "docs/INDEX.md",
       "docs/MINIMAL-GATE.md",
       "scripts/attest_delivery.py",
@@ -77,6 +76,7 @@
       "docs/BLIND-SPOTS.md",
       "docs/BOOTSTRAP-FROM-ZERO.md",
       "docs/BRAND.md",
+      "docs/CHANGELOG-BOOTSTRAP.md",
       "docs/DEPENDENCIES.md",
       "docs/FULL-WORKFLOW-FIGURE.md",
       "docs/FULL-WORKFLOW.md",
@@ -98,5 +98,9 @@
       "docs/VERIFY-EVIDENCE-0002.md"
     ]
   },
-  "_docs_integrity_manifest_note": "manifest.json 自己不在登记表里 —— 登记自己的哈希是个无限递归。这就是链条最后一环：**登记表本身没人守**。写下来，别假装它闭合了。"
+  "_docs_integrity_manifest_note": "manifest.json 自己不在登记表里 —— 登记自己的哈希是个无限递归。这就是链条最后一环：**登记表本身没人守**。写下来，别假装它闭合了。",
+  "_tested_limits": [
+    "逐字节重现一份长中文文档：做不到。docs/CHANGELOG-BOOTSTRAP.md 连着三次转写得到三串不同的字节（90431633 / 2e4b5de4，且体积都是 6225）。根因已定位：改本地文件时把「顺」写成了「順」，替换当场不匹配 —— 漂移在我转写那一步，不是存储通道。所以这份的登记值改成存储字节：它冻住以后的漂移，证明不了此刻逐字等于本地。",
+    "我读评论的通道会吞掉 HTML 注释，所以 marker 与 composer 哨兵在我眼里都是空的。能证明它们真在正文里的只有 attest。这正好是该有的分工，但也意味着我没法用肉眼替它做这件事。"
+  ]
 }
