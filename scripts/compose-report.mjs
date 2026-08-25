@@ -46,6 +46,26 @@ function fold(summary, text) {
   return '<details><summary>' + summary + '</summary>\n\n```\n' + text + '\n```\n\n</details>';
 }
 
+// ===========================================================================
+// **把正文里的 HTML 注释开头拆开。这不是美化，是一个真事故的修法。**
+//
+// 闸门第 6 条（回写 marker 一致）的 detail 里带着 marker 原文。这个函数不在的时候，
+// composer 会把它原样写进评论 —— **于是这条评论自己变成了 marker 查找的诱饵。**
+//
+// 平时看不见，因为只有一条报告评论，数到一条正好。但 run 32911142277 把 marker
+// 改歪之后多出了第二条评论，而那条里同样印着 marker 原文。于是 attest 数到
+// 两条，当场判「回写刷屏了」—— 而回写其实完全正常。
+//
+// 这是一条假红工厂：报告内容本身污染了那个用来找报告的标记。
+// 同形的一条也写在 verify.yml 的 attest 日志回贴那一步里。
+//
+// **耦合参数**：marker 的形状（HTML 注释）和这一行拆法钉在一起。改 marker 的形状
+// 就要重看这里。
+// ===========================================================================
+function defuse(text) {
+  return String(text == null ? '' : text).replace(/<!--/g, '<! --');
+}
+
 const sha = (process.env.GITHUB_SHA || 'local').slice(0, 7);
 const runLink = process.env.GITHUB_RUN_ID
   ? ' · [完整日志](' + (process.env.GITHUB_SERVER_URL || 'https://github.com') + '/' +
@@ -74,7 +94,7 @@ if (!data || typeof data.total !== 'number') {
       ? '报告文件在，但解析不出来。这算失败。'
       : '闸门在写出报告之前就崩了，或者 artifact 根本没上传。这算失败。',
     '',
-    log ? fold('stdout 末尾 ' + LOG_TAIL_LINES + ' 行', log.slice(-8000))
+    log ? fold('stdout 末尾 ' + LOG_TAIL_LINES + ' 行', defuse(log.slice(-8000)))
         : '连 stdout 也没拿到 —— 去看 workflow，不是看闸门。',
     ''
   ].join('\n'));
@@ -85,16 +105,16 @@ if (!data || typeof data.total !== 'number') {
   sections.push([
     '### ' + (failed ? '❌' : '✅') + ' ' + GATE.label + ' —— ' + data.passed + '/' + data.total,
     '',
-    ...(data.checks || []).map(c => '- ' + (c.ok ? '✅' : '❌') + ' ' + c.title + ' — `' + c.detail + '`'),
+    ...(data.checks || []).map(c => '- ' + (c.ok ? '✅' : '❌') + ' ' + defuse(c.title) + ' — `' + defuse(c.detail) + '`'),
     '',
     '- 规矩文件: ' + m.rulesBytes + ' bytes（AGENTS.md 与 CLAUDE.md 逐字节相同）',
     '- 盲区清单: ' + m.notBackedUpCount + ' 条',
     '- manifest 顶层键: ' + JSON.stringify(m.manifestTopKeys),
-    '- 回写 marker: `' + m.writebackMarker + '` · 共享 workflow ref: `' + m.upstreamRef + '`',
+    '- 回写 marker: `' + defuse(m.writebackMarker) + '` · 共享 workflow ref: `' + defuse(m.upstreamRef) + '`',
     ''
   ].join('\n'));
   if (failures.length) {
-    sections.push(['### 失败项', '', ...failures.map(f => '- ' + f), ''].join('\n'));
+    sections.push(['### 失败项', '', ...failures.map(f => '- ' + defuse(f)), ''].join('\n'));
   }
 }
 
