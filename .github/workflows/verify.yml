@@ -116,12 +116,71 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     permissions:
-      contents: read
-      issues: read
-      pull-requests: read
+      contents: write
+      issues: write
+      pull-requests: write
     steps:
       - uses: actions/checkout@v5
+
+      # continue-on-error 不是为了宽容,下面最后一步会把退出码原样吐回来。
+      # 它只是为了让中间那一步有机会把输出送到我读得到的地方。
       - name: 回头确认这一次的评论存在
+        id: attest
+        continue-on-error: true
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: python3 scripts/attest_delivery.py
+        run: |
+          set -o pipefail
+          python3 scripts/attest_delivery.py 2>&1 | tee /tmp/attest.log
+
+      # ----------------------------------------------------------------------
+      # **红了就把原始输出贴回来。** 这一步不是断言,删掉它 attest 照样红。
+      #
+      # 为什么需要它：Actions 的运行日志没有任何可用工具读得到。attest 自己又故意
+      # 不写评论（不占用回写的命名空间）。于是它红的时候手上只有一个比特：
+      # 过 / 不过。实测碰到过一次：闸门绿、回写绿、评论确实已更新成本次提交，
+      # 而 attest 仍然红 —— 而我无法分辨它红在哪一条。二分推送去猜的每一次
+      # 都是一次「读着判断」。修法不需要新能力，只要把结论摆到已有那条通道上。
+      #
+      # **这里有一个必须处理的回环，否则它会自己把下一轮弄成永久红：**
+      # attest 的输出里会印出它找的那个 marker 原文。直接贴上去的话，这条日志
+      # 评论本身就含有 marker，于是下一轮 attest 会数到两条带 marker 的评论，
+      # 当场判「回写刷屏了」。所以贴之前把 `<!--` 拆成 `<! --`。
+      # **这是一组耦合参数**：改 marker 的形状就要重看这一行。
+      # ----------------------------------------------------------------------
+      - name: 红了就把 attest 的原始输出贴回来
+        if: steps.attest.outcome != 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        run: |
+          set -uo pipefail
+          {
+            echo '<!-- anyworkflow-attest-log -->'
+            echo '### 送达核对红了，下面是它的原始输出'
+            echo
+            echo "提交 \`${GITHUB_SHA:0:7}\` · run \`${GITHUB_RUN_ID}\`"
+            echo
+            echo '```'
+            sed 's/<!--/<! --/g' /tmp/attest.log 2>/dev/null | tail -c 20000 \
+              || echo '（连 /tmp/attest.log 都没有 —— attest 在产出任何输出之前就断了）'
+            echo '```'
+          } > /tmp/attest-comment.md
+          PR="${PR_NUMBER:-}"
+          if [ -z "$PR" ] || [ "$PR" = 'null' ]; then
+            PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" \
+                   --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          fi
+          if [ -n "${PR:-}" ] && [ "$PR" != 'null' ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/attest-comment.md
+            echo "attest 原始输出已贴到 PR #${PR}"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" \
+              -f body="$(cat /tmp/attest-comment.md)" --jq '.html_url'
+          fi
+
+      - name: attest 失败则失败
+        if: steps.attest.outcome != 'success'
+        run: exit 1
