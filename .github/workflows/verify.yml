@@ -90,7 +90,7 @@ jobs:
       gates: '[{"name":"备份仓闸门","result":"${{ needs.backup-repo-gate.result }}"}]'
       composer-files: scripts/compose-report.mjs
       composer-entry: scripts/compose-report.mjs
-      marker: '<!-- anyworkflow-verify -->'
+      marker: '<!-- anyworkflow-verify-x -->'
 
   # ==========================================================================
   # 送达核对。**always() 是必须的**：闸门红的那次同样要证明结论送出去了 ——
