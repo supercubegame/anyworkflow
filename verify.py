@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -26,7 +27,7 @@ check('盲区清单存在', blind_exists, 'docs/BLIND-SPOTS.md')
 nonempty = isinstance(manifest.get('not_backed_up'), list) and len(manifest['not_backed_up']) > 0
 check('not_backed_up 不是空数组', nonempty, f"count={len(manifest.get('not_backed_up', [])) if isinstance(manifest.get('not_backed_up'), list) else 'bad-type'}")
 
-missing = [k for k in ['purpose','backed_up','not_backed_up','invariants','writeback'] if k not in manifest]
+missing = [k for k in ['purpose','backed_up','not_backed_up','invariants','writeback','docs_integrity'] if k not in manifest]
 check('manifest 顶层键齐全', len(missing) == 0, 'missing=' + (','.join(missing) if missing else 'none'))
 
 # --------------------------------------------------------------------------
@@ -87,6 +88,73 @@ else:
 check('composer 哨兵：写入方与核对方逐字相同', ok, detail)
 
 # --------------------------------------------------------------------------
+# 承重文件的逐字节身份。
+#
+# 这条是一次真事故换来的，而不是为了「看起来更完整」：把文档推上去之后逐个
+# 读回核对，发现存储里的字和发出去的不一样 —— 全是形近字，而且**字节长度
+# 一模一样**。于是一份讲「别安静地说谎」的文档变成了「别安静地说谁」，
+# 而体积、关键字、“文件存在”这三类检查全部毫无意见。
+#
+# 真源是本地导出的那份，登记在 manifest.docs_integrity 里。登记值是 40 位十六进制，
+# 纯 ASCII —— 它本身不会被这类改写碰到，而 CI 读的是**存储字节**重算。
+# 两边不等就红。
+#
+# 两件要记住：
+# 1. **这是一组有意的摩擦。** 改这些文件里的任何一个字，都必须同时重算登记值。
+#    报告会直接告诉你是哪一份、期望多少、实际多少。
+# 2. **它只守登记了的那几份。** 没登记的文件仍然可以被改字而闸门全绿，
+#    所以下面还有一条双向的清单断言盯着“该登记的都登记了”。
+#
+# 哈希函数自证：git 对空 blob 的公认常量。算错了的话下面每一条比较都不可信。
+# --------------------------------------------------------------------------
+EMPTY_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
+REGISTERED_DIRS = ('docs', 'scripts')
+
+def git_blob(raw):
+    return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
+
+integrity = manifest.get('docs_integrity') or {}
+check('blob 哈希函数自证（git 空 blob 常量）',
+      git_blob(b'') == EMPTY_BLOB, f'空 blob = {git_blob(b"")}')
+
+bad = []
+for rel in sorted(integrity):
+    want = integrity[rel]
+    target = ROOT / rel
+    if not target.exists():
+        bad.append(f'{rel}：登记了但文件不在')
+        continue
+    got = git_blob(target.read_bytes())
+    if got != want:
+        bad.append(f'{rel}：期望 {want[:12]} 实际 {got[:12]}'
+                   f'（{len(target.read_bytes())} bytes）')
+if not integrity:
+    ok, detail = False, 'manifest.docs_integrity 是空的 —— 一个空登记表让这条断言当场变空'
+else:
+    ok = not bad
+    detail = (f'{len(integrity)} 份全部逐字节相同' if ok
+              else '; '.join(bad))
+check('承重文件逐字节身份（blob 哈希）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 清单即期望，双向。手写清单永远追不上目录：新加一份文档而忘了登记，
+# 它不会喊，它只是不被检查。所以这里把**目录下实际存在的集合**当期望，
+# 多一个少一个都红。新增默认不通过，方向才是对的。
+# --------------------------------------------------------------------------
+on_disk = set()
+for d in REGISTERED_DIRS:
+    for f in sorted((ROOT / d).glob('*')):
+        if f.is_file():
+            on_disk.add(f'{d}/{f.name}')
+declared_reg = {k for k in integrity if k.split('/')[0] in REGISTERED_DIRS}
+missing_reg = sorted(on_disk - declared_reg)
+ghost_reg = sorted(declared_reg - on_disk)
+ok = not missing_reg and not ghost_reg
+detail = (f'docs/ 与 scripts/ 共 {len(on_disk)} 份，登记集合完全重合' if ok else
+          f'未登记：{missing_reg or "无"} · 登记了但不存在：{ghost_reg or "无"}')
+check('登记表与目录集合相等（docs/ · scripts/）', ok, detail)
+
+# --------------------------------------------------------------------------
 # 报告落盘。它不是断言，是让这条闸门的结论走得出这个 job —— Actions 的运行
 # 日志读不到，所以逐项结果要变成 artifact，再由共享回写 workflow 合成评论。
 # --------------------------------------------------------------------------
@@ -104,6 +172,11 @@ report = {
         'writebackMarker': declared,
         'upstreamRef': (manifest.get('writeback') or {}).get('upstream_ref'),
         'composerSentinel': composer_hits[0] if len(composer_hits) == 1 else None,
+        'registeredFiles': len(integrity),
+        'registeredDirsFileCount': len(on_disk),
+        'unregistered': sorted(missing_reg),
+        'registryLocalExport': len((manifest.get('docs_integrity_provenance') or {}).get('local_export') or []),
+        'registryStoredOnly': len((manifest.get('docs_integrity_provenance') or {}).get('stored_bytes_only') or []),
     },
 }
 ARTIFACTS.mkdir(exist_ok=True)
