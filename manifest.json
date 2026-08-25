@@ -28,7 +28,7 @@
     "registry_equals_directory": true
   },
   "docs_integrity": {
-    ".github/workflows/verify.yml": "82f8162406988eb3a47aefa14eb8c315a9cb2e7c",
+    ".github/workflows/verify.yml": "32dc29741f4046ec8d2576b55321b0bbd9d89b2d",
     "AGENTS.md": "e16e3cafa8d916273b7b84b3b960b3d19cec93cc",
     "CLAUDE.md": "e16e3cafa8d916273b7b84b3b960b3d19cec93cc",
     "docs/BLIND-SPOTS.md": "ec171da31854cfe38e4711398888265574436e5b",
@@ -58,21 +58,23 @@
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "a0d1265feef4056ee3678dfed853d2eb5ae6bf1a",
     "scripts/compose-report.mjs": "39b5d270013238e87f7835aa95e4cb81b424bad4",
-    "verify.py": "06ebea1873ba0e55c463510a425dbc60a5f60aa6"
+    "verify.py": "06ebea1873ba0e55c463510a425dbc60a5f60aa6",
+    "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。",
   "docs_integrity_provenance": {
     "local_export": [
-      ".github/workflows/verify.yml",
       "AGENTS.md",
       "CLAUDE.md",
       "docs/INDEX.md",
       "docs/MINIMAL-GATE.md",
+      "docs/VERIFY-EVIDENCE-0003.md",
       "scripts/attest_delivery.py",
       "scripts/compose-report.mjs",
       "verify.py"
     ],
     "stored_bytes_only": [
+      ".github/workflows/verify.yml",
       "docs/BLIND-SPOTS.md",
       "docs/BOOTSTRAP-FROM-ZERO.md",
       "docs/BRAND.md",
