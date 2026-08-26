@@ -1,18 +1,186 @@
 name: verify
 
+# 这个文件以前只有 checkout + 跑闸门，一共 313 字节。**它是绿的，而且什么都没送出去。**
+# 实测确认过一次：PR #10 的「备份仓闸门」是 success，那条 PR 上评论 0 条。
+# 也就是说这仓一直在示范一套「闸门 + 回写 + 送达核对」的方法，而它自己只有第一层。
+#
+# 「送不出结论的闸门等于没跑」这句话在 docs/FULL-WORKFLOW.md 里写着，
+# 而它在这个文件上不成立了很久。现在三层都在：
+#
+#   1. 闸门本体,python3 verify.py，逐项结果落成 artifact
+#   2. 回写,走共享 workflow 把逐项证据合成一条评论
+#   3. 送达核对,回头去 API 上确认**这一次**那条评论真的存在
+#
+# 第 3 层不是第 2 层的复读：回写那一步内部有「发完读回来」，但那是监控自证清白。
+# attest 从外面看，看的和读评论的人拿到的是同一份东西。
 on:
   push:
     branches: ['**']
   workflow_dispatch:
 
+concurrency:
+  group: verify-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   backup-repo-gate:
+    # 这个 job 名字是承重的：docs/VERIFY-EVIDENCE-0001 / 0002 两条证据链都按
+    # 「备份仓闸门」指认它。改名会让那两页指向一个不存在的东西。
     name: 备份仓闸门
     runs-on: ubuntu-24.04
+    timeout-minutes: 6
     steps:
       - uses: actions/checkout@v5
+
+      # continue-on-error 是为了让报告还能上传;job 在最后一步才真的失败。
+      #
+      # **tee 必须配 pipefail。** bash 默认取管道最后一个命令的退出码，也就是
+      # tee 的 0,闸门红了 job 照样绿，而这个假绿是本文件推荐的做法自己带来的。
       - name: 跑最小闸门
+        id: gate
+        continue-on-error: true
         shell: bash
         run: |
-          set -euo pipefail
-          python3 verify.py
+          set -o pipefail
+          mkdir -p artifacts
+          python3 verify.py 2>&1 | tee artifacts/stdout-backup.log
+
+      # 名字必须匹配 report-*，日志必须叫 stdout-<slug>.log,那是共享回写
+      # workflow 的调用方约定。报告缺失时评论里带的就是这份日志的尾巴：
+      # 「没有产出报告」只说明监控坏了，不说明为什么。
+      #
+      # if-no-files-found: error,产物为空要立刻喊。空产物 + 降级评论叠在一起
+      # 最难查。
+      - name: 上传报告
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: report-backup
+          path: artifacts/
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: 闸门失败则失败
+        if: steps.gate.outcome != 'success'
+        run: exit 1
+
+  # ==========================================================================
+  # 回写走 supercubegame/ci-workflows 那一份共享 workflow，跟随上游 main。
+  #
+  # **@main 是有意的，代价也是真的**：上游改一行，这里的行为跟着变，而本仓
+  # 任何断言都看不见。选它的理由写在上游那个文件的文件头里 —— 一半消费者钉
+  # SHA、一半跟 main 的话，两边都绿而行为已经不同，而那种分叉这套东西已经真
+  # 踩过一次（漏掉 flappycat 那次）。生态里其它消费者都在 main 上。
+  #
+  # 落点不在本仓：这条风险的看守是外部观察者，不是断言。
+  #
+  # marker 这一行是耦合参数,真源在 manifest.json 的 writeback.marker，
+  # attest 从那里读，闸门断言这一行等于那里。改一处忘了另一处，两个方向都红。
+  #
+  # **这两条断言已经在 live CI 里各自红过一次**（run 32911142277），而那一轮还顺手
+  # 证明了一件更重要的事：改歪 marker 之后，回写依然贴出了评论，但贴在新 marker
+  # 下；而 attest 按 manifest 去找，找到的是上一轮那条陈旧评论（写着「10つ10 全部
+  # 通过」）。**只断言「带 marker 的评论存在」的话，那一轮会变绿。** 详见
+  # docs/VERIFY-EVIDENCE-0003.md。
+  # ==========================================================================
+  report:
+    name: 回报结果
+    needs: [backup-repo-gate]
+    if: always()
+    permissions:
+      contents: write
+      pull-requests: write
+    uses: supercubegame/ci-workflows/.github/workflows/report.yml@main
+    with:
+      node-version: '22'
+      gates: '[{"name":"备份仓闸门","result":"${{ needs.backup-repo-gate.result }}"}]'
+      composer-files: scripts/compose-report.mjs
+      composer-entry: scripts/compose-report.mjs
+      marker: '<!-- anyworkflow-verify -->'
+
+  # ==========================================================================
+  # 送达核对。**always() 是必须的**：闸门红的那次同样要证明结论送出去了 ——
+  # README 的 Quick Install 第 8 步要求别人做这件事，而这仓自己一直做不到。
+  # 这一条已经实测过（run 32908614769：闸门 failure、回写 failure、attest success）。
+  #
+  # 它故意不占用产物名与日志名那两个命名空间：占用会让「集合相等」类断言红在
+  # 命名上，而那是假红。
+  #
+  # 它 exit 2 的意思是「本次什么都没核对到」（自证没过，或前置条件缺），
+  # 那不是绿,和 exit 1「送达链有问题」是两件不同的事。
+  # ==========================================================================
+  attest:
+    name: 核对结论真的送达了
+    needs: [report]
+    if: always()
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+
+      # continue-on-error 不是为了宽容,下面最后一步会把退出码原样吐回来。
+      # 它只是为了让中间那一步有机会把输出送到我读得到的地方。
+      - name: 回头确认这一次的评论存在
+        id: attest
+        continue-on-error: true
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -o pipefail
+          python3 scripts/attest_delivery.py 2>&1 | tee /tmp/attest.log
+
+      # ----------------------------------------------------------------------
+      # **红了就把原始输出贴回来。** 这一步不是断言,删掉它 attest 照样红。
+      #
+      # 为什么需要它：Actions 的运行日志没有任何可用工具读得到。attest 自己又故意
+      # 不写评论（不占用回写的命名空间）。于是它红的时候手上只有一个比特：
+      # 过 / 不过。实测碰到过一次：闸门绿、回写绿、评论确实已更新成本次提交，
+      # 而 attest 仍然红 —— 而我无法分辨它红在哪一条。二分推送去猜的每一次
+      # 都是一次「读着判断」。修法不需要新能力，只要把结论摆到已有那条通道上。
+      #
+      # **这里有一个必须处理的回环，否则它会自己把下一轮弄成永久红：**
+      # attest 的输出里会印出它找的那个 marker 原文。直接贴上去的话，这条日志
+      # 评论本身就含有 marker，于是下一轮 attest 会数到两条带 marker 的评论，
+      # 当场判「回写刷屏了」。所以贴之前把 `<!--` 拆成 `<! --`。
+      # **这是一组耦合参数**：改 marker 的形状就要重看这一行。
+      # ----------------------------------------------------------------------
+      - name: 红了就把 attest 的原始输出贴回来
+        if: steps.attest.outcome != 'success'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number || '' }}
+        run: |
+          set -uo pipefail
+          {
+            echo '<!-- anyworkflow-attest-log -->'
+            echo '### 送达核对红了，下面是它的原始输出'
+            echo
+            echo "提交 \`${GITHUB_SHA:0:7}\` · run \`${GITHUB_RUN_ID}\`"
+            echo
+            echo '```'
+            sed 's/<!--/<! --/g' /tmp/attest.log 2>/dev/null | tail -c 20000 \
+              || echo '（连 /tmp/attest.log 都没有 —— attest 在产出任何输出之前就断了）'
+            echo '```'
+          } > /tmp/attest-comment.md
+          PR="${PR_NUMBER:-}"
+          if [ -z "$PR" ] || [ "$PR" = 'null' ]; then
+            PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" \
+                   --state open --json number --jq '.[0].number' 2>/dev/null || true)
+          fi
+          if [ -n "${PR:-}" ] && [ "$PR" != 'null' ]; then
+            gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file /tmp/attest-comment.md
+            echo "attest 原始输出已贴到 PR #${PR}"
+          else
+            gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA/comments" \
+              -f body="$(cat /tmp/attest-comment.md)" --jq '.html_url'
+          fi
+
+      - name: attest 失败则失败
+        if: steps.attest.outcome != 'success'
+        run: exit 1

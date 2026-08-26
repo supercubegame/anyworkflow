@@ -1,32 +1,493 @@
 #!/usr/bin/env python3
+import hashlib
 import json
+import re
+from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
+ARTIFACTS = ROOT / 'artifacts'
 manifest = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
 
 checks = []
 
-def check(title, ok, detail):
-    checks.append((title, ok, detail))
+# --------------------------------------------------------------------------
+# 每条检查带一个稳定 id。**id 才是承重的，标题可以随便改** ——
+# 拿可读名字当键会让「改个名」变成承重操作，而重命名应该是响亮的、
+# 不是静默的。id 与 manifest.invariants 的键集合必须相等（见文件末尾那条）。
+#
+# id 重复也要红：两条检查共用一个 id 的话，集合相等依然成立，
+# 而其中一条就无人登记了 —— 那是用集合当期望的经典漏网口。
+# --------------------------------------------------------------------------
+def check(cid, title, ok, detail):
+    checks.append((cid, title, ok, detail))
     print(("PASS" if ok else "FAIL") + f"  {title} | {detail}")
 
 agents = (ROOT / 'AGENTS.md').read_bytes()
 claude = (ROOT / 'CLAUDE.md').read_bytes()
-check('AGENTS.md 与 CLAUDE.md 逐字节相同', agents == claude, f'{len(agents)} bytes')
+check('rules_files_identical', 'AGENTS.md 与 CLAUDE.md 逐字节相同', agents == claude, f'{len(agents)} bytes')
 
 recovery_exists = (ROOT / 'docs' / 'RECOVERY.md').exists()
-check('恢复说明存在', recovery_exists, 'docs/RECOVERY.md')
+check('recovery_doc_exists', '恢复说明存在', recovery_exists, 'docs/RECOVERY.md')
 
 blind_exists = (ROOT / 'docs' / 'BLIND-SPOTS.md').exists()
-check('盲区清单存在', blind_exists, 'docs/BLIND-SPOTS.md')
+check('blind_spots_doc_exists', '盲区清单存在', blind_exists, 'docs/BLIND-SPOTS.md')
 
 nonempty = isinstance(manifest.get('not_backed_up'), list) and len(manifest['not_backed_up']) > 0
-check('not_backed_up 不是空数组', nonempty, f"count={len(manifest.get('not_backed_up', [])) if isinstance(manifest.get('not_backed_up'), list) else 'bad-type'}")
+check('not_backed_up_nonempty', 'not_backed_up 不是空数组', nonempty, f"count={len(manifest.get('not_backed_up', [])) if isinstance(manifest.get('not_backed_up'), list) else 'bad-type'}")
 
-missing = [k for k in ['purpose','backed_up','not_backed_up','invariants'] if k not in manifest]
-check('manifest 顶层键齐全', len(missing) == 0, 'missing=' + (','.join(missing) if missing else 'none'))
+missing = [k for k in ['purpose','backed_up','not_backed_up','invariants','writeback','docs_integrity'] if k not in manifest]
+check('manifest_top_keys', 'manifest 顶层键齐全', len(missing) == 0, 'missing=' + (','.join(missing) if missing else 'none'))
 
-failed = sum(1 for _, ok, _ in checks if not ok)
-print(f"\n共执行 {len(checks)} 条检查，通过 {len(checks)-failed}，失败 {failed}")
-raise SystemExit(1 if failed else 0)
+# --------------------------------------------------------------------------
+# 回写 marker 是一组耦合参数：workflow 传出去的那个，和 attest 回头去找的那个，
+# 必须逐字相同。真源在 manifest.writeback.marker —— attest 从那里读（真取用点），
+# 这条断言把 workflow 里那一行钉在同一个值上。改一处忘了另一处，两个方向都红。
+#
+# 扫描前先剥掉注释行：下面这段解释文字里就出现过 marker 这个词，而
+# 「某段里有没有 X」不先切段就找，会同时制造漏报和误报。剥完先自证还剩真东西，
+# 剥成空字符串的话后面这条会免费通过。
+# --------------------------------------------------------------------------
+WF_PATH = ROOT / '.github' / 'workflows' / 'verify.yml'
+wf_raw = WF_PATH.read_text(encoding='utf-8')
+wf_code = '\n'.join(l for l in wf_raw.splitlines() if not l.lstrip().startswith('#'))
+declared = (manifest.get('writeback') or {}).get('marker')
+found = re.findall(r"^[ \t]*marker:[ \t]*'([^']+)'[ \t]*$", wf_code, re.M)
+
+if 'jobs:' not in wf_code or 'uses:' not in wf_code:
+    ok, detail = False, '剥掉注释之后 workflow 里连 jobs:/uses: 都不见了 —— 剥过头了，这条断言本身不可信'
+elif len(found) != 1:
+    ok, detail = False, f'workflow 里的 marker: 行有 {len(found)} 条，应该恰好 1 条（找到：{found}）'
+elif not declared:
+    ok, detail = False, 'manifest.writeback.marker 缺失或为空 —— attest 会拿空值去找评论，那条断言当场变空'
+else:
+    ok = found[0] == declared
+    detail = f'workflow={found[0]!r} manifest={declared!r}'
+check('writeback_marker_pinned', '回写 marker：workflow 与 manifest 逐字相同', ok, detail)
+
+# --------------------------------------------------------------------------
+# composer 哨兵是第二组耦合参数：compose-report.mjs 往评论里写的那串，和
+# attest_delivery.py 回头找的那串，必须逐字相同。它承重的原因是共享回写
+# workflow 的**兜底评论也带着同一个 marker** —— 分开「完整报告」与「没有逐项
+# 证据的兜底」，全靠这个哨兵。两边漂开的话 attest 会把每一次完整报告都判成
+# 说不清，或者更糟：把兜底读成完整。
+#
+# 这条断言自己不持有那个字面量，它从两个真取用点各抄一次再比 —— 整段重写
+# 弄丢一处，另一处还在用它，当场红。
+# --------------------------------------------------------------------------
+SENTINEL_RE = re.compile(r"^[ \t]*(?:const[ \t]+)?COMPOSER_SENTINEL[ \t]*=[ \t]*'([^']+)'", re.M)
+
+def strip_comments(text, tokens):
+    kept = [l for l in text.splitlines()
+            if not any(l.lstrip().startswith(t) for t in tokens)]
+    return '\n'.join(kept)
+
+composer_src = strip_comments((ROOT / 'scripts' / 'compose-report.mjs').read_text(encoding='utf-8'), ('//',))
+attest_src = strip_comments((ROOT / 'scripts' / 'attest_delivery.py').read_text(encoding='utf-8'), ('#',))
+composer_hits = SENTINEL_RE.findall(composer_src)
+attest_hits = SENTINEL_RE.findall(attest_src)
+
+if 'writeFileSync' not in composer_src or 'def evaluate' not in attest_src:
+    ok, detail = False, '剥掉注释之后两个脚本里连主体代码都不见了 —— 剥过头了，这条断言本身不可信'
+elif len(composer_hits) != 1 or len(attest_hits) != 1:
+    ok, detail = False, (f'哨兵定义应该各恰好 1 处，实际 composer={len(composer_hits)} attest={len(attest_hits)}')
+else:
+    ok = composer_hits[0] == attest_hits[0]
+    detail = f'composer={composer_hits[0]!r} attest={attest_hits[0]!r}'
+check('composer_sentinel_pinned', 'composer 哨兵：写入方与核对方逐字相同', ok, detail)
+
+# --------------------------------------------------------------------------
+# 承重文件的逐字节身份。
+# --------------------------------------------------------------------------
+EMPTY_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
+REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows')
+
+def git_blob(raw):
+    return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
+
+integrity = manifest.get('docs_integrity') or {}
+check('blob_hash_selftest', 'blob 哈希函数自证（git 空 blob 常量）',
+      git_blob(b'') == EMPTY_BLOB, f'空 blob = {git_blob(b"")}')
+
+bad = []
+for rel in sorted(integrity):
+    want = integrity[rel]
+    target = ROOT / rel
+    if not target.exists():
+        bad.append(f'{rel}：登记了但文件不在')
+        continue
+    got = git_blob(target.read_bytes())
+    if got != want:
+        bad.append(f'{rel}：期望 {want[:12]} 实际 {got[:12]}'
+                   f'（{len(target.read_bytes())} bytes）')
+if not integrity:
+    ok, detail = False, 'manifest.docs_integrity 是空的 —— 一个空登记表让这条断言当场变空'
+else:
+    ok = not bad
+    detail = (f'{len(integrity)} 份全部逐字节相同' if ok
+              else '; '.join(bad))
+check('registered_files_byte_identical', '承重文件逐字节身份（blob 哈希）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 清单即期望，双向。
+# --------------------------------------------------------------------------
+on_disk = set()
+for d in REGISTERED_DIRS:
+    for f in sorted((ROOT / d).glob('*')):
+        if f.is_file():
+            on_disk.add(f'{d}/{f.name}')
+declared_reg = {k for k in integrity
+                if any(k.startswith(d + '/') for d in REGISTERED_DIRS)}
+missing_reg = sorted(on_disk - declared_reg)
+ghost_reg = sorted(declared_reg - on_disk)
+ok = not missing_reg and not ghost_reg
+dirs_label = ' · '.join(d + '/' for d in REGISTERED_DIRS)
+detail = (f'{dirs_label} 共 {len(on_disk)} 份，登记集合完全重合' if ok else
+          f'未登记：{missing_reg or "无"} · 登记了但不存在：{ghost_reg or "无"}')
+check('registry_equals_directory', f'登记表与目录集合相等（{dirs_label}）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 真抄本的四条断言。
+# --------------------------------------------------------------------------
+true_copies = manifest.get('true_copies') or {}
+copies = (true_copies.get('copies') or {})
+
+bad = []
+anchor_total = 0
+for rel in sorted(copies):
+    spec = copies[rel]
+    target = ROOT / rel
+    anchors = spec.get('anchors') or []
+    anchor_total += len(anchors)
+    if not anchors:
+        bad.append(f'{rel}：一条锚点都没登记 —— 那这份抄本就回到了只靠哈希守')
+        continue
+    if not target.exists():
+        bad.append(f'{rel}：登记了但文件不在')
+        continue
+    text = target.read_text(encoding='utf-8', errors='replace')
+    miss = [a for a in anchors if a not in text]
+    if miss:
+        bad.append(f'{rel}：{len(miss)}/{len(anchors)} 条锚点失配 -> {miss}')
+if not copies:
+    ok, detail = False, 'manifest.true_copies.copies 是空的 —— 空登记表让这条断言当场变空'
+else:
+    ok = not bad
+    detail = (f'{len(copies)} 份抄本共 {anchor_total} 条锚点全部命中' if ok else '; '.join(bad))
+check('true_copy_anchors', '真抄本正文锚点（逐条命中）', ok, detail)
+
+bad = []
+section_total = 0
+for rel in sorted(copies):
+    spec = copies[rel]
+    target = ROOT / rel
+    want = spec.get('required_sections') or []
+    section_total += len(want)
+    if not want:
+        bad.append(f'{rel}：没登记任何必需小节')
+        continue
+    if not target.exists():
+        bad.append(f'{rel}：文件不在')
+        continue
+    lines = target.read_text(encoding='utf-8', errors='replace').splitlines()
+    for head in want:
+        idx = next((i for i, l in enumerate(lines) if l.strip() == head.strip()), None)
+        if idx is None:
+            bad.append(f'{rel}：缺小节 {head!r}')
+            continue
+        body = []
+        for l in lines[idx + 1:]:
+            if l.strip().startswith('### ') or (head.endswith(':') and l and not l[0].isspace()):
+                break
+            body.append(l)
+        if not ''.join(body).strip():
+            bad.append(f'{rel}：小节 {head!r} 在，但内容是空的')
+ok = bool(copies) and not bad
+detail = (f'{len(copies)} 份抄本共 {section_total} 个必需小节全部非空' if ok
+          else ('; '.join(bad) if bad else 'copies 为空'))
+check('true_copy_restore_sufficiency', '真抄本恢复充分性（必需小节非空）', ok, detail)
+
+max_age = true_copies.get('max_readback_age_days')
+valid_max_age = isinstance(max_age, int) and not isinstance(max_age, bool) and max_age > 0
+now = datetime.now(timezone.utc)
+bad = []
+ages = []
+for rel in sorted(copies):
+    raw = (copies[rel] or {}).get('readback_at')
+    if not raw:
+        bad.append(f'{rel}：没有 readback_at —— 一份没有读回时间的抄本等于一张旧纸')
+        continue
+    try:
+        when = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+    except ValueError:
+        bad.append(f'{rel}：readback_at 解析不了：{raw!r}')
+        continue
+    age = (now - when).total_seconds() / 86400.0
+    ages.append((rel, age))
+    if age < -(10 / 1440.0):
+        bad.append(f'{rel}：readback_at 落在未来（{-age:.2f} 天后）：{raw}')
+    elif valid_max_age and age > max_age:
+        bad.append(f'{rel}：读回已 {age:.1f} 天，超过上限 {max_age} 天：{raw}')
+if not valid_max_age:
+    ok, detail = False, f'max_readback_age_days 不是正整数：{max_age!r} —— 没有期限的新鲜度断言是空的'
+elif not copies:
+    ok, detail = False, 'copies 为空'
+else:
+    ok = not bad
+    oldest = max(ages, key=lambda x: x[1]) if ages else None
+    detail = ((f'最旧那份 {oldest[0]} 已 {oldest[1]:.1f} 天，还剩 {max_age - oldest[1]:.1f} 天'
+               f'（上限 {max_age}）') if ok else '; '.join(bad))
+check('true_copy_readback_freshness', '真抄本读回新鲜度（带期限）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 形近错字黑名单。
+# --------------------------------------------------------------------------
+CONFUSABLES = {
+    '\u62c4\u672c': '\u6284\u672c',
+    '\u8bf4\u8c01': '\u8bf4\u8c0e',
+    '\u6492\u8c01': '\u6492\u8c0e',
+    '\u5206\u5c98': '\u5206\u5c94',
+    '\u9ab6\u67b6': '\u9aa8\u67b6',
+    '\u9806': '\u987a',
+}
+degenerate = [b for b, g in CONFUSABLES.items() if b == g]
+scanned = []
+found = []
+STRIP_BY_SUFFIX = {'.py': ('#',), '.mjs': ('//',), '.yml': ('#',)}
+for rel in sorted(integrity):
+    target = ROOT / rel
+    if not target.exists() or target.suffix not in ('.md', '.json', '.py', '.mjs', '.yml'):
+        continue
+    raw = target.read_text(encoding='utf-8', errors='replace')
+    tokens = STRIP_BY_SUFFIX.get(target.suffix)
+    if tokens:
+        text = strip_comments(raw, tokens)
+        if len(text.strip()) < len(raw.strip()) * 0.3:
+            found.append(f'{rel}：剥掉注释后只剩不到三成，剥过头了，这一份的扫描不可信')
+            continue
+    else:
+        text = raw
+    scanned.append(rel)
+    for b, g in CONFUSABLES.items():
+        n = text.count(b)
+        if n:
+            found.append(f'{rel}：{b} ×{n}（应为 {g}）')
+if degenerate:
+    ok, detail = False, f'黑名单里有 {len(degenerate)} 项错字等于正字 —— 那几项永远不会命中'
+elif not scanned:
+    ok, detail = False, '一份文件都没扫到 —— 这条断言当场变空'
+else:
+    ok = not found
+    detail = (f'扫了 {len(scanned)} 份，{len(CONFUSABLES)} 项黑名单 0 命中' if ok
+              else '; '.join(found))
+check('confusables_blacklist', '形近错字黑名单（负向扫描）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 跨抄本一致性。
+# --------------------------------------------------------------------------
+def section_value(path, head):
+    if not path.exists():
+        return None
+    lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    idx = next((i for i, l in enumerate(lines) if l.strip() == head.strip()), None)
+    if idx is None:
+        return None
+    for l in lines[idx + 1:]:
+        if l.strip().startswith('### '):
+            break
+        t = l.strip()
+        if t.startswith('- '):
+            return t[2:].strip()
+    return None
+
+obligations = {o.get('id'): o for o in (manifest.get('obligations') or [])}
+pairs = true_copies.get('cross_copy') or []
+bad = []
+notes_cc = []
+for spec in pairs:
+    pid = spec.get('id')
+    src, tgt = ROOT / spec['source'], ROOT / spec['target']
+    want = section_value(tgt, spec['target_section'])
+    if want is None:
+        bad.append(f"{spec['target']}：读不到 {spec['target_section']} 下的值—— 这条跨抄本断言什么都证明不了")
+        continue
+    src_text = src.read_text(encoding='utf-8', errors='replace') if src.exists() else ''
+    if not src_text:
+        bad.append(f"{spec['source']}：读不到正文")
+        continue
+    consistent = want in src_text
+    ob = obligations.get(pid)
+    if consistent and ob:
+        bad.append(f'{pid}：两份抄本已经一致了，而义务还挂着 —— 做完了请删掉它，一份挂着已完成事项的清单没人会再读')
+    elif consistent:
+        notes_cc.append(f'{pid}：一致（{want!r} 出现在 {spec["source"]} 里）')
+    elif not ob:
+        bad.append(f'{pid}：不一致且**没有登记义务** —— {spec["target"]} 的 {spec["target_section"]} 是 {want!r}，而它没出现在 {spec["source"]} 里')
+    else:
+        due_raw = ob.get('due')
+        try:
+            due = datetime.fromisoformat(str(due_raw) + 'T00:00:00+00:00')
+        except ValueError:
+            bad.append(f'{pid}：义务的 due 解析不了：{due_raw!r}')
+            continue
+        left = (due - now).total_seconds() / 86400.0
+        if left < 0:
+            bad.append(f'{pid}：义务已过期 {-left:.1f} 天（due {due_raw}）。到期只有两个正确反应：真的修完，或确认做不到并挑进 _tested_limits。把日期往后挑不在选项里')
+        else:
+            notes_cc.append(f'{pid}：不一致，已登记为带期限的义务，还剩 {left:.1f} 天（{spec["target"]} 是 {want!r}）')
+if not pairs:
+    ok, detail = False, 'true_copies.cross_copy 是空的 —— 空清单让这条断言当场变空'
+else:
+    ok = not bad
+    detail = ('; '.join(notes_cc) if ok else '; '.join(bad))
+check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期限的义务）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 共享回写 workflow 的消费者集合，**由生成物供给散文**。
+#
+# DEPENDENCIES.md 现在比从前诚实得多：它写的是**一次真读回**。但它仍然是手写台账，
+# 而手写清单永远追不上目录。第一次漏的是 flappycat，第二次漏的是 crossyroad。
+#
+# 所以这里反过来一把：不再让散文自己声明「有哪些消费者」，让它**指向一份生成物**。
+# 新增一个 workflow 而忘了更新这份生成物 -> 红。生成物和散文不一致 -> 红。
+#
+# 这里故意只守「共享回写 workflow 的消费者」这一层，不泛化成「所有 workflow」：
+# 那样会把不相关的流水线也卷进来，变成一条大而空的断言。
+# --------------------------------------------------------------------------
+CONSUMER_FILES = {
+    'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml'],
+    'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
+    'flappycat': ['verify.yml'],
+    'meetnote': ['verify.yml'],
+    'jumpwow': ['verify.yml'],
+    'image-grabber': ['verify.yml'],
+    'crossyroad': ['verify.yml'],
+}
+consumer_path = ROOT / 'docs' / 'SHARED-WRITEBACK-CONSUMERS.md'
+expected_repo_count = len(CONSUMER_FILES)
+# 这里数的是『消费者 workflow 文件』，不是『所有依赖文件』。
+expected_workflow_count = sum(len(v) for v in CONSUMER_FILES.values())
+
+def render_consumers():
+    lines = [
+        '# Shared Writeback Consumers',
+        '',
+        "This file is generated from the backup repo's current workspace knowledge of repos that call `supercubegame/ci-workflows/.github/workflows/report.yml`.",
+        'It exists because a hand-maintained prose list already missed real consumers twice, and the first version of this generated list missed one again.',
+        '',
+        f'- Repositories: **{expected_repo_count}**',
+        f'- Workflow files: **{expected_workflow_count}**',
+        '',
+    ]
+    for repo in sorted(CONSUMER_FILES):
+        lines.append(f'## {repo}')
+        for wf in CONSUMER_FILES[repo]:
+            lines.append(f'- `.github/workflows/{wf}`')
+        lines.append('')
+    return '\n'.join(lines).rstrip() + '\n'
+
+generated = render_consumers()
+actual = consumer_path.read_text(encoding='utf-8') if consumer_path.exists() else None
+if actual is None:
+    ok, detail = False, 'docs/SHARED-WRITEBACK-CONSUMERS.md 不存在 —— 散文又会退回成手写记忆'
+else:
+    ok = actual == generated
+    detail = (f'{expected_repo_count} 个仓库 / {expected_workflow_count} 份 workflow，生成物与登记完全一致' if ok
+              else '生成物与当前登记不一致 —— 新增/删改了消费者但没同步这份文件')
+check('shared_writeback_consumers_generated', '共享回写消费者生成物与登记相等', ok, detail)
+
+# --------------------------------------------------------------------------
+# manifest.invariants 与实际跑的检查，**集合相等**。
+# --------------------------------------------------------------------------
+declared_inv = set((manifest.get('invariants') or {}).keys())
+SELF = ROOT / 'verify.py'
+self_code = strip_comments(SELF.read_text(encoding='utf-8'), ('#',))
+scanned_ids = re.findall(r"^[ \t]*check\(\s*'([a-z0-9_]+)'", self_code, re.M)
+dup_ids = sorted({i for i in scanned_ids if scanned_ids.count(i) > 1})
+actual_inv = set(scanned_ids)
+unregistered = sorted(actual_inv - declared_inv)
+orphaned = sorted(declared_inv - actual_inv)
+
+if not scanned_ids:
+    ok, detail = False, ('从源码里一个 check id 都没扫到 —— 正则写歪了，而空集合会让这条断言对着一份空声明免费通过')
+elif 'invariants_match_checks' not in actual_inv:
+    ok, detail = False, ('扫到的 id 里没有本条自己 —— 正向对照失败，扫描结果不可信')
+elif dup_ids:
+    ok, detail = False, (f'有 {len(dup_ids)} 个 id 重复：{dup_ids} —— 集合相等依然成立，而其中一条就无人登记了')
+elif not declared_inv:
+    ok, detail = False, 'manifest.invariants 是空的 —— 空声明让这条断言当场变空'
+elif unregistered or orphaned:
+    ok, detail = False, (f'未登记的检查：{unregistered or "无"} · 登记了但没有对应检查：{orphaned or "无"}。**修法是两边对齐，不是把声明删成空的**')
+else:
+    ok, detail = True, f'{len(actual_inv)} 条检查与声明集合完全重合（按 id 从源码扫，不按标题、不按顺序）'
+check('invariants_match_checks', 'manifest.invariants 与实际检查集合相等', ok, detail)
+
+# --------------------------------------------------------------------------
+# 检查总数的等号断言，以及 MINIMAL-GATE 里那个数字。
+# --------------------------------------------------------------------------
+declared_checks = ((manifest.get('checks') or {}).get('verify'))
+actual_checks = len(checks) + 1
+gate_doc = ROOT / 'docs' / 'MINIMAL-GATE.md'
+gate_text = gate_doc.read_text(encoding='utf-8', errors='replace') if gate_doc.exists() else ''
+if not isinstance(declared_checks, int) or declared_checks <= 0:
+    ok, detail = False, f'manifest.checks.verify 不是正整数：{declared_checks!r}'
+elif declared_checks != actual_checks:
+    ok, detail = False, (f'登记 {declared_checks} 条，实际跑了 {actual_checks} 条。**修法是把断言补回来，不是把期望数改小**')
+elif not gate_text:
+    ok, detail = False, 'docs/MINIMAL-GATE.md 读不到 —— 那句话的交叉核对无法进行'
+elif str(actual_checks) not in gate_text:
+    ok, detail = False, (f'docs/MINIMAL-GATE.md 里找不到 {actual_checks} 这个数 —— 那句「守哪几件事」已经不成立了')
+else:
+    ok, detail = True, f'{actual_checks} 条，登记值与 MINIMAL-GATE 里那个数都对上了'
+check('checks_count_equals', '检查总数（等号）与 MINIMAL-GATE 里那个数', ok, detail)
+
+# --------------------------------------------------------------------------
+# 报告落盘。
+# --------------------------------------------------------------------------
+if scanned_ids and scanned_ids[-1] != 'checks_count_equals':
+    checks.append(('checks_count_last', '计数那一条必须排在最后', False,
+                   f'源码里最后一个 check 是 {scanned_ids[-1]!r} —— len(checks)+1 那个偏移量已经不成立。**把新检查移到计数那一条之前，不要改偏移量**'))
+    print('FAIL  计数那一条必须排在最后 | ' + checks[-1][3])
+
+failures = [f'{t} | {d}' for _, t, ok_, d in checks if not ok_]
+report = {
+    'gate': 'backup',
+    'passed': len(checks) - len(failures),
+    'total': len(checks),
+    'failures': failures,
+    'checks': [{'id': i, 'title': t, 'ok': ok_, 'detail': d} for i, t, ok_, d in checks],
+    'metrics': {
+        'rulesBytes': len(agents),
+        'notBackedUpCount': len(manifest.get('not_backed_up', []) or []),
+        'manifestTopKeys': sorted(manifest.keys()),
+        'writebackMarker': declared,
+        'upstreamRef': (manifest.get('writeback') or {}).get('upstream_ref'),
+        'composerSentinel': composer_hits[0] if len(composer_hits) == 1 else None,
+        'registeredFiles': len(integrity),
+        'registeredDirsFileCount': len(on_disk),
+        'unregistered': sorted(missing_reg),
+        'registryLocalExport': len((manifest.get('docs_integrity_provenance') or {}).get('local_export') or []),
+        'registryStoredOnly': len((manifest.get('docs_integrity_provenance') or {}).get('stored_bytes_only') or []),
+        'trueCopies': len(copies),
+        'anchorTotal': anchor_total,
+        'requiredSectionTotal': section_total,
+        'maxReadbackAgeDays': max_age,
+        'oldestReadbackAgeDays': (round(max(a for _, a in ages), 2) if ages else None),
+        'confusablesScanned': len(scanned),
+        'confusablesBlacklist': len(CONFUSABLES),
+        'crossCopyPairs': len(pairs),
+        'sharedWritebackRepos': expected_repo_count,
+        'sharedWritebackWorkflows': expected_workflow_count,
+        'openObligations': len(obligations),
+        'checksVerify': actual_checks,
+        'invariantsDeclared': len(declared_inv),
+        'invariantIds': sorted(actual_inv),
+    },
+}
+ARTIFACTS.mkdir(exist_ok=True)
+(ARTIFACTS / 'verify-report.json').write_text(
+    json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+
+print(f"\n共执行 {len(checks)} 条检查，通过 {len(checks)-len(failures)}，失败 {len(failures)}")
+print('报告已写入 artifacts/verify-report.json')
+raise SystemExit(1 if failures else 0)
