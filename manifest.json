@@ -74,7 +74,7 @@
     "verify.py": "2d2cfa2d12f6658c5ce95dd9095b6695717625af",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "add264c3a7fd0be3a88dd95a11b492d9bfd0feb0",
-    "agents/gate-audit-quinn.md": "8e6076a61f5f1e8a3a646121ca28800982bb9ed6",
+    "agents/gate-audit-quinn.md": "61d3f48c2a934bb1eeacdc2c49e4e387f8ce390b",
     "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。",
@@ -158,7 +158,7 @@
       },
       "agents/gate-audit-quinn.md": {
         "live": "ClickUp Super Agent: 闸门审计 Quinn",
-        "readback_at": "2026-08-17T08:26:47Z",
+        "readback_at": "2026-08-26T05:54:00Z",
         "kind": "full-prompt",
         "required_sections": [
           "### Name",
@@ -204,16 +204,7 @@
       }
     ]
   },
-  "obligations": [
-    {
-      "id": "quinn-knows-devon-cron",
-      "why": "Quinn 的 live prompt 里写着「Devon 的定时应当恰好是一条 0 9 * * 1」，而 Devon 抄本里的 Schedules 是 20 10 * * *（每天 10:20）。Devon 自己的 Description 还写着「每周」而正文已经是「每天 10:20」。Quinn 的报告模板里也还写着「Devon 定时一条周一 09:00」。也就是说：**那个每天读回 Devon 定时的巡检，手里的期望值是错的** —— 它每天都会把一条正常的定时报成异常，或者反过来。",
-      "fix": "改 Quinn 的 live prompt（两处：读回那一节的期望值、报告模板那一句），然后重导一份抄本。**改真身和同步抄本是一件事的两半。** 顺手把 Devon 的 Description 从「每周」改成「每天」。",
-      "blocked_by": "Quinn 的 prompt 是 30KB 中文，而 _tested_limits 第一条已登记：我逐字节重现长中文文档做不到。整份重写大概率会把它改坏，而那比现在这个错贵得多。所以这一步需要一次**定点修改**，不是整份重推。",
-      "due": "2026-09-09",
-      "completion": "agents/drift-devon.md 的 ### Schedules 那个值，必须出现在 agents/gate-audit-quinn.md 的正文里。**它读两份真文件，不读我的报告** —— 一条靠自己声明完成的义务等于没有义务。"
-    }
-  ],
+  "obligations": [],
   "_obligations": "带期限的义务。宽限期内只报剩多少天，过期判红。**到期只有两个正确反应，都不是把日期往后挑**：真的做完了（删记录），或者确认做不到（挑进 _tested_limits）。**做完了还挂着也判红** —— 一份挂着已完成事项的清单，没人会再读它。",
   "checks": {
     "verify": 18
