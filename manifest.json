@@ -74,7 +74,7 @@
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
-    "verify.py": "abff50ae757c954bc6c35a8614825874392ff279",
+    "verify.py": "ed16f6ed2532ac4032b0497e618ca815a98504d2",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "427e7e7e08c29a6f2c345b5a3078775148bce9fc",
     "agents/gate-audit-quinn.md": "59a14f884e491ff42cd51f49a20f54cf4d19f4e5",
