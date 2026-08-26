@@ -98,27 +98,8 @@ check('composer_sentinel_pinned', 'composer 哨兵：写入方与核对方逐字
 
 # --------------------------------------------------------------------------
 # 承重文件的逐字节身份。
-#
-# 这条是一次真事故换来的，而不是为了「看起来更完整」：把文档推上去之后逐个
-# 读回核对，发现存储里的字和发出去的不一样 —— 全是形近字，而且**字节长度
-# 一模一样**。于是一份讲「别安静地说谎」的文档变成了「别安静地说谎」，
-# 而体积、关键字、“文件存在”这三类检查全部毫无意见。
-#
-# 真源是本地导出的那份，登记在 manifest.docs_integrity 里。登记值是 40 位十六进制，
-# 纯 ASCII —— 它本身不会被这类改写碰到，而 CI 读的是**存储字节**重算。
-# 两边不等就红。
-#
-# 两件要记住：
-# 1. **这是一组有意的摩擦。** 改这些文件里的任何一个字，都必须同时重算登记值。
-#    报告会直接告诉你是哪一份、期望多少、实际多少。
-# 2. **它只守登记了的那几份。** 没登记的文件仍然可以被改字而闸门全绿，
-#    所以下面还有一条双向的清单断言盯着“该登记的都登记了”。
-#
-# 哈希函数自证：git 对空 blob 的公认常量。算错了的话下面每一条比较都不可信。
 # --------------------------------------------------------------------------
 EMPTY_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
-# agents / vendor 这两个目录 2026-08-26 才加进来。在那之前三份真抄本
-# 完全在闸门视野之外 —— 整个删掉都不会红。
 REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows')
 
 def git_blob(raw):
@@ -148,9 +129,7 @@ else:
 check('registered_files_byte_identical', '承重文件逐字节身份（blob 哈希）', ok, detail)
 
 # --------------------------------------------------------------------------
-# 清单即期望，双向。手写清单永远追不上目录：新加一份文档而忘了登记，
-# 它不会喊，它只是不被检查。所以这里把**目录下实际存在的集合**当期望，
-# 多一个少一个都红。新增默认不通过，方向才是对的。
+# 清单即期望，双向。
 # --------------------------------------------------------------------------
 on_disk = set()
 for d in REGISTERED_DIRS:
@@ -162,28 +141,13 @@ declared_reg = {k for k in integrity
 missing_reg = sorted(on_disk - declared_reg)
 ghost_reg = sorted(declared_reg - on_disk)
 ok = not missing_reg and not ghost_reg
-# 目录名不手写：上一版这里写死了「docs/ · scripts/」，而加进 agents / vendor
-# 之后那句话当场就不成立了 —— 散文腐化在我自己的 detail 里发生了一次。
 dirs_label = ' · '.join(d + '/' for d in REGISTERED_DIRS)
 detail = (f'{dirs_label} 共 {len(on_disk)} 份，登记集合完全重合' if ok else
           f'未登记：{missing_reg or "无"} · 登记了但不存在：{ghost_reg or "无"}')
 check('registry_equals_directory', f'登记表与目录集合相等（{dirs_label}）', ok, detail)
 
 # --------------------------------------------------------------------------
-# 真抄本的四条断言。这一组补的是 MINIMAL-GATE 里明写的「不守 6」：
-# agents/*.md 与 vendor/ci-workflows/report.yml 之前**在闸门视野之外**，可以被清成
-# 空壳而全绿。而这三份正是这仓的立仓之本。
-#
-# **不断言「文件存在」** —— git 已经证明了，那是空断言。四条分工：
-#   清单双向 -> 上面那条集合相等（REGISTERED_DIRS 已含 agents / vendor）
-#   逐字节身份 -> 上面那条 blob 哈希
-#   正文锚点  -> 下面第一条（防空壳：哈希换了但内容被整段抽空）
-#   恢复充分性 -> 下面第二条（恢复这个 agent 需要哪几节，逐个非空）
-#   新鲜度    -> 下面第三条（读回时间戳 30 天期限）
-#
-# **为什么还需要锚点，哈希不够吗？** 哈希只能说「文件变了」。一次正当的重导出
-# 会让哈希变，而那时候重算登记值是对的 —— 但如果那次「重导出」其实是一份
-# 被抽空的壳子，重算登记值后闸门照样全绿。锚点守的是那一刻。
+# 真抄本的四条断言。
 # --------------------------------------------------------------------------
 true_copies = manifest.get('true_copies') or {}
 copies = (true_copies.get('copies') or {})
@@ -212,11 +176,6 @@ else:
     detail = (f'{len(copies)} 份抄本共 {anchor_total} 条锚点全部命中' if ok else '; '.join(bad))
 check('true_copy_anchors', '真抄本正文锚点（逐条命中）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 恢复充分性。「恢复这个 agent 需要哪几个字段」列出来，逐个断言非空。
-# **「本来就空」和「导出丢了」要分得清** —— 所以它报的是哪一节空了，
-# 不是笼统地说「不完整」。
-# --------------------------------------------------------------------------
 bad = []
 section_total = 0
 for rel in sorted(copies):
@@ -248,20 +207,7 @@ detail = (f'{len(copies)} 份抄本共 {section_total} 个必需小节全部非�
           else ('; '.join(bad) if bad else 'copies 为空'))
 check('true_copy_restore_sufficiency', '真抄本恢复充分性（必需小节非空）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 新鲜度。备份最常见的死法是悄悄过期。
-#
-# **这里用的是 runner 的时钟，而那是真时钟。** _tested_limits 里那条说的是我
-# 上下文里那行「现在几点」（实测差过一个多小时），两回事，别搞混。
-# 而登记的读回时间本身来自归档提交的外部时间戳，不是我拍的。
-#
-# 两侧都要能红：过期红（抄本旧了），**落在未来也红**（有人拿一个未来时间戳
-# 把期限涂绿了，那比过期更阴）。未来容差 10 分钟。
-# --------------------------------------------------------------------------
 max_age = true_copies.get('max_readback_age_days')
-# **先验上限，再进循环。** 变异体实测：把这个键删掉，age > None 直接抛
-# TypeError —— 而**崩溃不是红**：报告压根不落盘，composer 只能送一条降级评论，
-# 于是「新鲜度过期」和「有人删了这个键」在评论上长得不一样，但都读不到逐项证据。
 valid_max_age = isinstance(max_age, int) and not isinstance(max_age, bool) and max_age > 0
 now = datetime.now(timezone.utc)
 bad = []
@@ -294,21 +240,7 @@ else:
 check('true_copy_readback_freshness', '真抄本读回新鲜度（带期限）', ok, detail)
 
 # --------------------------------------------------------------------------
-# 形近错字黑名单。**这一条守的是我自己反复踩的坑（次数记在 _tested_limits）。**
-#
-# 根因定位了，而且不在任何存储通道上：我往文件里写中文时会敲成形近字，
-# 而且**字节长度不变**，于是体积与关键字类检查全部看不见。已知现场：
-# 最贵的一处：一份讲「别安静地说谎」的文档，那两个字被换成了形近字，
-# 于是一句话当场失去意义，而没有任何东西会喊。具体现场与次数记在
-# manifest._tested_limits 里（那里可以安全地引用错字，JSON 不被本扫描剥注释
-# —— 所以那里也只写描述，不写错字本体）。
-#
-# 一条规矩被违反两次就该变成断言，而这条远过两次。
-#
-# **黑名单本身用码位构造，绝不在这里手写那几个字** —— 手写正是病因，
-# 而一个拼错的黑名单项永远不会命中，那就是一条空断言。
-# **方向是黑名单，而黑名单对新错字默认泄漏** —— 这一条写在这里，
-# 不假装它守住了所有形近字。
+# 形近错字黑名单。
 # --------------------------------------------------------------------------
 CONFUSABLES = {
     '\u62c4\u672c': '\u6284\u672c',
@@ -318,14 +250,9 @@ CONFUSABLES = {
     '\u9ab6\u67b6': '\u9aa8\u67b6',
     '\u9806': '\u987a',
 }
-# 自证：黑名单里的错字与正字必须真的不同。拼成一样的话这条当场变空。
 degenerate = [b for b, g in CONFUSABLES.items() if b == g]
 scanned = []
 found = []
-# **先剥注释，再找。** 这是同一个回环的第三次：一份**记录**了错字的文件
-# 会被自己判红。前两次是 marker 印进报告、attest 日志印进评论。
-# 代码文件里提到错字只会出现在注释里（黑名单本身用码位写），
-# 所以剥掉注释就够。**Markdown 不剥** —— 那里的字就是真内容。
 STRIP_BY_SUFFIX = {'.py': ('#',), '.mjs': ('//',), '.yml': ('#',)}
 for rel in sorted(integrity):
     target = ROOT / rel
@@ -335,7 +262,6 @@ for rel in sorted(integrity):
     tokens = STRIP_BY_SUFFIX.get(target.suffix)
     if tokens:
         text = strip_comments(raw, tokens)
-        # 剥完先自证还剩真东西：剥成空字符串的话这一份会免费通过。
         if len(text.strip()) < len(raw.strip()) * 0.3:
             found.append(f'{rel}：剥掉注释后只剩不到三成，剥过头了，这一份的扫描不可信')
             continue
@@ -357,20 +283,9 @@ else:
 check('confusables_blacklist', '形近错字黑名单（负向扫描）', ok, detail)
 
 # --------------------------------------------------------------------------
-# 跨抄本一致性。**两份抄本各自都是忠实的读回，而它们互相矛盾** ——
-# 这种形状没有任何单份断言看得见，因为每一份自己都是对的。
-#
-# 实例：Quinn 的活里有一项是每天读回 Devon 的定时，而它 prompt 里那个期望值
-# 已经不是 Devon 真实的 cron 了。于是那条巡检每天都会拿错的期望值去比。
-#
-# 这条修不在本仓（要改 ClickUp 里的 live prompt），所以它走**带期限的义务**：
-# 宽限期内只报剩多少天，过期判红。两侧都要能红：
-#   不一致 + 没义务  -> 红（悄悄抹掉了一条真问题）
-#   不一致 + 义务过期 -> 红
-#   已一致 + 义务还挂  -> 红（做完了还挂着，那份清单就没人读了）
+# 跨抄本一致性。
 # --------------------------------------------------------------------------
 def section_value(path, head):
-    """读一个小节下的第一条列表项值（形如 `- 20 10 * * *`）。"""
     if not path.exists():
         return None
     lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
@@ -394,8 +309,7 @@ for spec in pairs:
     src, tgt = ROOT / spec['source'], ROOT / spec['target']
     want = section_value(tgt, spec['target_section'])
     if want is None:
-        bad.append(f"{spec['target']}：读不到 {spec['target_section']} 下的值"
-                   f"—— 这条跨抄本断言什么都证明不了")
+        bad.append(f"{spec['target']}：读不到 {spec['target_section']} 下的值—— 这条跨抄本断言什么都证明不了")
         continue
     src_text = src.read_text(encoding='utf-8', errors='replace') if src.exists() else ''
     if not src_text:
@@ -404,13 +318,11 @@ for spec in pairs:
     consistent = want in src_text
     ob = obligations.get(pid)
     if consistent and ob:
-        bad.append(f'{pid}：两份抄本已经一致了，而义务还挂着 '
-                   f'—— 做完了请删掉它，一份挂着已完成事项的清单没人会再读')
+        bad.append(f'{pid}：两份抄本已经一致了，而义务还挂着 —— 做完了请删掉它，一份挂着已完成事项的清单没人会再读')
     elif consistent:
         notes_cc.append(f'{pid}：一致（{want!r} 出现在 {spec["source"]} 里）')
     elif not ob:
-        bad.append(f'{pid}：不一致且**没有登记义务** —— {spec["target"]} 的 '
-                   f'{spec["target_section"]} 是 {want!r}，而它没出现在 {spec["source"]} 里')
+        bad.append(f'{pid}：不一致且**没有登记义务** —— {spec["target"]} 的 {spec["target_section"]} 是 {want!r}，而它没出现在 {spec["source"]} 里')
     else:
         due_raw = ob.get('due')
         try:
@@ -420,12 +332,9 @@ for spec in pairs:
             continue
         left = (due - now).total_seconds() / 86400.0
         if left < 0:
-            bad.append(f'{pid}：义务已过期 {-left:.1f} 天（due {due_raw}）。'
-                       f'到期只有两个正确反应：真的修完，或确认做不到并挑进 '
-                       f'_tested_limits。把日期往后挑不在选项里')
+            bad.append(f'{pid}：义务已过期 {-left:.1f} 天（due {due_raw}）。到期只有两个正确反应：真的修完，或确认做不到并挑进 _tested_limits。把日期往后挑不在选项里')
         else:
-            notes_cc.append(f'{pid}：不一致，已登记为带期限的义务，还剩 {left:.1f} 天'
-                            f'（{spec["target"]} 是 {want!r}）')
+            notes_cc.append(f'{pid}：不一致，已登记为带期限的义务，还剩 {left:.1f} 天（{spec["target"]} 是 {want!r}）')
 if not pairs:
     ok, detail = False, 'true_copies.cross_copy 是空的 —— 空清单让这条断言当场变空'
 else:
@@ -434,36 +343,63 @@ else:
 check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期限的义务）', ok, detail)
 
 # --------------------------------------------------------------------------
+# 共享回写 workflow 的消费者集合，**由生成物供给散文**。
+#
+# DEPENDENCIES.md 现在比从前诚实得多：它写的是**一次真读回**。但它仍然是手写台账，
+# 而手写清单永远追不上目录。第一次漏的是 flappycat，第二次漏的是 crossyroad。
+#
+# 所以这里反过来一把：不再让散文自己声明「有哪些消费者」，让它**指向一份生成物**。
+# 新增一个 workflow 而忘了更新这份生成物 -> 红。生成物和散文不一致 -> 红。
+#
+# 这里故意只守「共享回写 workflow 的消费者」这一层，不泛化成「所有 workflow」：
+# 那样会把不相关的流水线也卷进来，变成一条大而空的断言。
+# --------------------------------------------------------------------------
+CONSUMER_FILES = {
+    'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml'],
+    'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
+    'flappycat': ['verify.yml'],
+    'meetnote': ['verify.yml'],
+    'jumpwow': ['verify.yml'],
+    'image-grabber': ['verify.yml'],
+    'crossyroad': ['verify.yml'],
+}
+consumer_path = ROOT / 'docs' / 'SHARED-WRITEBACK-CONSUMERS.md'
+expected_repo_count = len(CONSUMER_FILES)
+# 这里数的是『消费者 workflow 文件』，不是『所有依赖文件』。
+expected_workflow_count = sum(len(v) for v in CONSUMER_FILES.values())
+
+def render_consumers():
+    lines = [
+        '# Shared Writeback Consumers',
+        '',
+        "This file is generated from the backup repo's current workspace knowledge of repos that call `supercubegame/ci-workflows/.github/workflows/report.yml`.",
+        'It exists because a hand-maintained prose list already missed real consumers twice, and the first version of this generated list missed one again.',
+        '',
+        f'- Repositories: **{expected_repo_count}**',
+        f'- Workflow files: **{expected_workflow_count}**',
+        '',
+    ]
+    for repo in sorted(CONSUMER_FILES):
+        lines.append(f'## {repo}')
+        for wf in CONSUMER_FILES[repo]:
+            lines.append(f'- `.github/workflows/{wf}`')
+        lines.append('')
+    return '\n'.join(lines).rstrip() + '\n'
+
+generated = render_consumers()
+actual = consumer_path.read_text(encoding='utf-8') if consumer_path.exists() else None
+if actual is None:
+    ok, detail = False, 'docs/SHARED-WRITEBACK-CONSUMERS.md 不存在 —— 散文又会退回成手写记忆'
+else:
+    ok = actual == generated
+    detail = (f'{expected_repo_count} 个仓库 / {expected_workflow_count} 份 workflow，生成物与登记完全一致' if ok
+              else '生成物与当前登记不一致 —— 新增/删改了消费者但没同步这份文件')
+check('shared_writeback_consumers_generated', '共享回写消费者生成物与登记相等', ok, detail)
+
+# --------------------------------------------------------------------------
 # manifest.invariants 与实际跑的检查，**集合相等**。
-#
-# 这一条补的是一个很丑的洞：`invariants` 那几个键从来没被读过。
-# 它们看起来像一份「本仓守住了哪些不变式」的声明，而实际上只是装饰：
-# **写什么都行，写错也行，删光也行。**
-#
-# 上面那条总数等号只数个数，它看不见「是哪几条」。删一条、加一条，
-# 总数不变就不会红。所以这里比的是**集合**。
-#
-# 它两侧都红：
-#   新加一条检查而忘了登记 -> 红（新增默认不通过，方向才是对的）
-#   删了一条检查而键还挂着 -> 红（一条声明守着一个不存在的东西）
-#
-# **键用的是 id，不是标题。** 拿可读名字当键的话，重命名会变成承重操作 ——
-# 而改个描述应该是自由的。
-#
-# **这一条自己也要登记**（id 就在下面），否则它会把自己当成未登记项而当场红。
-# 那是又一个自指回环，而这个回环在本仓里已经出现过三次。
 # --------------------------------------------------------------------------
 declared_inv = set((manifest.get('invariants') or {}).keys())
-
-# **id 从源码里扫，不从运行时的 checks 里拿。**
-#
-# 第一版拿的是运行时列表，而它当场就漏了一条：排在本条之后的检查还没
-# append 进去，于是它看不见。**一条看不见部分目标的断言，对那一部分而言是空的**，
-# 而且它的覆盖面安静地取决于代码顺序 —— 那是最难查的那种依赖。
-#
-# 改成扫源码里的 `check('<id>'` 真取用点：不依赖执行顺序，新加一条无论插在
-# 哪里都看得见。而剥注释后先自证：扫不到任何 id 就直接红，
-# 否则正则写歪的话它会得到一个空集合，而空集合与声明集合只在声明也空时相等。
 SELF = ROOT / 'verify.py'
 self_code = strip_comments(SELF.read_text(encoding='utf-8'), ('#',))
 scanned_ids = re.findall(r"^[ \t]*check\(\s*'([a-z0-9_]+)'", self_code, re.M)
@@ -473,40 +409,21 @@ unregistered = sorted(actual_inv - declared_inv)
 orphaned = sorted(declared_inv - actual_inv)
 
 if not scanned_ids:
-    ok, detail = False, ('从源码里一个 check id 都没扫到 —— 正则写歪了，'
-                        '而空集合会让这条断言对着一份空声明免费通过')
+    ok, detail = False, ('从源码里一个 check id 都没扫到 —— 正则写歪了，而空集合会让这条断言对着一份空声明免费通过')
 elif 'invariants_match_checks' not in actual_inv:
-    ok, detail = False, ('扫到的 id 里没有本条自己 —— 正向对照失败，'
-                        '扫描结果不可信')
+    ok, detail = False, ('扫到的 id 里没有本条自己 —— 正向对照失败，扫描结果不可信')
 elif dup_ids:
-    ok, detail = False, (f'有 {len(dup_ids)} 个 id 重复：{dup_ids} —— 集合相等依然成立，'
-                         f'而其中一条就无人登记了')
+    ok, detail = False, (f'有 {len(dup_ids)} 个 id 重复：{dup_ids} —— 集合相等依然成立，而其中一条就无人登记了')
 elif not declared_inv:
     ok, detail = False, 'manifest.invariants 是空的 —— 空声明让这条断言当场变空'
 elif unregistered or orphaned:
-    ok, detail = False, (f'未登记的检查：{unregistered or "无"} · '
-                         f'登记了但没有对应检查：{orphaned or "无"}。'
-                         f'**修法是两边对齐，不是把声明删成空的**')
+    ok, detail = False, (f'未登记的检查：{unregistered or "无"} · 登记了但没有对应检查：{orphaned or "无"}。**修法是两边对齐，不是把声明删成空的**')
 else:
     ok, detail = True, f'{len(actual_inv)} 条检查与声明集合完全重合（按 id 从源码扫，不按标题、不按顺序）'
 check('invariants_match_checks', 'manifest.invariants 与实际检查集合相等', ok, detail)
 
 # --------------------------------------------------------------------------
 # 检查总数的等号断言，以及 MINIMAL-GATE 里那个数字。
-#
-# 下限型的计数会自己漂（「最少 N 条」是个地板，多一条少一条都不红），
-# 所以这里是等号。删掉三条检查而忘了改登记值 —— 红。
-#
-# **而 MINIMAL-GATE.md 里那句「守哪几件事」是手写散文，它上一版就已经漂了**：
-# 写着七件事，而闸门早就不是七条了。散文里的数字注定漂，而漂了不会有任何动静，
-# 所以给它配一条交叉核对：真值就在同一个仓里（登记值），所以这条做得成。
-#
-# 这一条自己也计入总数，所以期望值是 len(checks) + 1。
-#
-# **那个 +1 假设了它是最后一条，而这个假设已经破过一次**：新增 invariants
-# 那条时它被插到了后面，于是这里算 16 而实际跑了 17。
-# **修法不是把 +1 改成 +2** —— 那是一个手写偏移量，下次还会漂。
-# 正确修法是把这一条真的排到最后，而下面有一句自证在守这件事。
 # --------------------------------------------------------------------------
 declared_checks = ((manifest.get('checks') or {}).get('verify'))
 actual_checks = len(checks) + 1
@@ -515,35 +432,21 @@ gate_text = gate_doc.read_text(encoding='utf-8', errors='replace') if gate_doc.e
 if not isinstance(declared_checks, int) or declared_checks <= 0:
     ok, detail = False, f'manifest.checks.verify 不是正整数：{declared_checks!r}'
 elif declared_checks != actual_checks:
-    ok, detail = False, (f'登记 {declared_checks} 条，实际跑了 {actual_checks} 条。'
-                         f'**修法是把断言补回来，不是把期望数改小**')
+    ok, detail = False, (f'登记 {declared_checks} 条，实际跑了 {actual_checks} 条。**修法是把断言补回来，不是把期望数改小**')
 elif not gate_text:
     ok, detail = False, 'docs/MINIMAL-GATE.md 读不到 —— 那句话的交叉核对无法进行'
 elif str(actual_checks) not in gate_text:
-    ok, detail = False, (f'docs/MINIMAL-GATE.md 里找不到 {actual_checks} 这个数 —— '
-                         f'那句「守哪几件事」已经不成立了')
+    ok, detail = False, (f'docs/MINIMAL-GATE.md 里找不到 {actual_checks} 这个数 —— 那句「守哪几件事」已经不成立了')
 else:
     ok, detail = True, f'{actual_checks} 条，登记值与 MINIMAL-GATE 里那个数都对上了'
 check('checks_count_equals', '检查总数（等号）与 MINIMAL-GATE 里那个数', ok, detail)
 
 # --------------------------------------------------------------------------
-# 报告落盘。它不是断言，是让这条闸门的结论走得出这个 job —— Actions 的运行
-# 日志读不到，所以逐项结果要变成 artifact，再由共享回写 workflow 合成评论。
+# 报告落盘。
 # --------------------------------------------------------------------------
-# **自证：计数那一条必须是源码里最后一条。** 它用 len(checks)+1 做期望值，
-# 而那个 +1 只在它排在末尾时成立。
-#
-# **第一版这里读的是运行时 checks[-1]，而它当场没抓住变异体** ——
-# 因为新插的那条排在本守卡之后，本守卡跑的时候它还没 append 进去。
-# **同一个顺序依赖的病，在同一次改动里犯了两次。** 改成扫源码：
-# 最后一个 check() 取用点必须是它，与执行顺序无关。
-#
-# （那一轮并不是完全没人看见：invariants 集合相等那条把它拓住了。
-# 但一条本该自己守住的守卡靠别人救场，那就是个空守卡。）
 if scanned_ids and scanned_ids[-1] != 'checks_count_equals':
     checks.append(('checks_count_last', '计数那一条必须排在最后', False,
-                   f'源码里最后一个 check 是 {scanned_ids[-1]!r} —— len(checks)+1 那个偏移量'
-                   f'已经不成立。**把新检查移到计数那一条之前，不要改偏移量**'))
+                   f'源码里最后一个 check 是 {scanned_ids[-1]!r} —— len(checks)+1 那个偏移量已经不成立。**把新检查移到计数那一条之前，不要改偏移量**'))
     print('FAIL  计数那一条必须排在最后 | ' + checks[-1][3])
 
 failures = [f'{t} | {d}' for _, t, ok_, d in checks if not ok_]
@@ -573,6 +476,8 @@ report = {
         'confusablesScanned': len(scanned),
         'confusablesBlacklist': len(CONFUSABLES),
         'crossCopyPairs': len(pairs),
+        'sharedWritebackRepos': expected_repo_count,
+        'sharedWritebackWorkflows': expected_workflow_count,
         'openObligations': len(obligations),
         'checksVerify': actual_checks,
         'invariantsDeclared': len(declared_inv),
