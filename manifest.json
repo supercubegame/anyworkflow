@@ -36,6 +36,7 @@
     "confusables_blacklist": true,
     "cross_copy_consistency": true,
     "shared_writeback_consumers_generated": true,
+    "prompt_archive_split": true,
     "invariants_match_checks": true,
     "checks_count_equals": true
   },
@@ -54,8 +55,9 @@
     "docs/INCIDENT-LEDGER.md": "43a8f6b796dc8fcfed22e135bf1322b6cce89623",
     "docs/INDEX.md": "e63acd891e21ed1279d5c2697ec7682ec06ab5a8",
     "docs/LIVE-READBACK-LEDGER.md": "f1baecd9e4becace2e2a828afb0b9231f320c546",
-    "docs/MINIMAL-GATE.md": "a08746d9e0f60c291e34985dbeca2d4a9e0854e0",
+    "docs/MINIMAL-GATE.md": "99903055f27adf66d7481249722c85a58de0bc12",
     "docs/OBSERVER-PROMPTS.md": "9ef45ac37bac7fdc2a942c7d1a4d3cf6e0d635b6",
+    "docs/QUINN-FIELD-NOTES.md": "bfefe01f556936cb934ac409f8f2080e0e7c0453",
     "docs/OBSERVERS.md": "00f94d70c0faf1a303a295cee906c2486d9ffe9d",
     "docs/OFFLINE-BACKUP-FIGURE.md": "df08c0a091ad6a3003b032a090c44f6c1f1a5181",
     "docs/OFFLINE-BACKUP-SCHEME.md": "66dd8f99b956e21e53dabd748982ce546b8cf2a9",
@@ -72,7 +74,7 @@
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
-    "verify.py": "2f5d7bb9095c8dcb5d5ef0fbb0443d0d3b210109",
+    "verify.py": "ad2d3d01c98223c4ee5983b2f9b75a74e86dbfca",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "427e7e7e08c29a6f2c345b5a3078775148bce9fc",
     "agents/gate-audit-quinn.md": "48b7d84dc256b1f5e8cd6b02bf12e740c134a2bc",
@@ -123,7 +125,7 @@
   },
   "_docs_integrity_manifest_note": "manifest.json 不在 docs_integrity 里 —— 登记自己的哈希是个无限递归。这就是链条最后一环：**登记表本身没人守**。写下来，别假装它闭合了。docs_integrity 守别的文件；manifest 自己靠顶层键、invariants、checks、以及外部读回来守。",
   "_tested_limits": [
-    "逐字节重现一份长中文文档：做不到，而**根因已定位**：不是存储通道，是我往文件里写中文时会敲成形近字，手写 Unicode 转义时同样会敲错码位，而两种都**字节长度不变** —— 所以体积与关键字类检查全部看不见。已踩九次（最后几次就在写这条断言本身的注释与文档里）。现在有一条黑名单断言在守，而它上线后的每一轮都在干活。**黑名单对新错字默认泄漏**：实测两个漏网的例子（一个简繁形近、一个敌意无关的同音字）它都没抓到。方向对，覆盖面不完整。**2026-08-26 补一条反例**：同一天把三份大文件（verify.py 25KB、manifest 13KB、MINIMAL-GATE 14KB）在本地逐字节重建并用 blob 哈希核对，三份全中。所以这条限制要收窄成：**盲写长中文不可靠，而写完立即用哈希自证是可靠的** —— 差别不在能力，在有没有一把尺。",
+    "逐字节重现一份长中文文档：做不到，而**根因已定位**：不是存储通道，是我往文件里写中文时会敲成形近字，手写 Unicode 转义时同样会敲错码位，而两种都**字节长度不变** —— 所以体积与关键字类检查全部看不见。已踩九次（最后几次就在写这条断言本身的注释与文档里）。现在有一条黑名单断言在守，而它上线后的每一轮都在干活。**黑名单对新错字默认泄漏**：实测两个漏网的例子（一个简繁形近、一个敌意无关的同音字）它都没抓到。**2026-08-26 补一条反例**：同一天把三份大文件（verify.py 25KB、manifest 13KB、MINIMAL-GATE 14KB）在本地逐字节重建并用 blob 哈希核对，三份全中。所以这条限制要收窄成：**盲写长中文不可靠，而写完立即用哈希自证是可靠的** —— 差别不在能力，在有没有一把尺。",
     "我读评论的通道会吞掉 HTML 注释，所以 marker 与 composer 哨兵在我眼里都是空的。能证明它们真在正文里的只有 attest。这正好是该有的分工，但也意味着我没法用肉眼替它做这件事。",
     "GitHub 评论的删除 / 编辑不在我的工具里。PR #14 上留着一条带 -x marker 的评论（#5418393988），它的正文中间含着真 marker。改成「认第一行」之后它不再影响判据，所以不需要删 —— 但如果以后真需要删一条评论，那是用户手动动作。",
     "报告里的哈希只印前 12 位。第一次登记 workflow 新哈希时我用那 12 位接上编的后 28 位，当场自查才改成从 API 读全值。教训：截断的标识符只能用来看，不能用来写。",
@@ -214,10 +216,24 @@
       }
     ]
   },
+  "prompt_split": {
+    "archive": "docs/QUINN-FIELD-NOTES.md",
+    "prompt_copy": "agents/gate-audit-quinn.md",
+    "moved_sections": [
+      "## 为什么是每天，而不是每周",
+      "## 事故档案",
+      "## meetnote：两种相反的失效",
+      "## flappycat：定时和心跳有了，而它守不住自己",
+      "## 共享回写的版本策略",
+      "## 备份仓与 TodoX 特别看什么",
+      "## 测不出来的：这份清单唯一的常规外部审计",
+      "## 已知的通道限制"
+    ]
+  },
   "obligations": [],
   "_obligations": "带期限的义务。宽限期内只报剩多少天，过期判红。**到期只有两个正确反应，都不是把日期往后挑**：真的做完了（删记录），或者确认做不到（挑进 _tested_limits）。**做完了还挂着也判红** —— 一份挂着已完成事项的清单，没人会再读它。",
   "checks": {
-    "verify": 19
+    "verify": 20
   },
-  "_checks": "等号，不是下限。下限型的计数会自己漂。而它同时钉着 docs/MINIMAL-GATE.md 里那个数。这次从 18 变 19，就是因为新增了 true_copy_size_floor 那条。"
+  "_checks": "等号，不是下限。下限型的计数会自己漂。而它同时钉着 docs/MINIMAL-GATE.md 里那个数。这次从 19 变 20，就是因为新增了 prompt_archive_split 那条。"
 }

@@ -436,7 +436,6 @@ CONSUMER_FILES = {
 }
 consumer_path = ROOT / 'docs' / 'SHARED-WRITEBACK-CONSUMERS.md'
 expected_repo_count = len(CONSUMER_FILES)
-# 这里数的是『消费者 workflow 文件』，不是『所有依赖文件』。
 expected_workflow_count = sum(len(v) for v in CONSUMER_FILES.values())
 
 def render_consumers():
@@ -466,6 +465,51 @@ else:
     detail = (f'{expected_repo_count} 个仓库 / {expected_workflow_count} 份 workflow，生成物与登记完全一致' if ok
               else '生成物与当前登记不一致 —— 新增/删改了消费者但没同步这份文件')
 check('shared_writeback_consumers_generated', '共享回写消费者生成物与登记相等', ok, detail)
+
+# --------------------------------------------------------------------------
+# 指令 / 档案的拆分守卫，**负向那侧是承重的**。
+#
+# Quinn 的 prompt 长到 30948 字节之后被自己重写掉了七成八，所以它按「指令 / 档案」
+# 拆开了：prompt 只留铁律与判据，案例史搬进 docs/QUINN-FIELD-NOTES.md。
+#
+# 光断言「档案文件存在且不空」是空的 —— **复制一份留两处同样通过**，然后两边
+# 各自长歪而没有任何东西看得见。所以四件一起断，而承重的是最后两条：
+#   - 档案存在且不空
+#   - prompt 抄本真的指向档案（正向对照；它也让「忘了重导出」当场红）
+#   - 搬走的那几节标题**全都在档案里**
+#   - 搬走的那几节标题**一条都不在 prompt 抄本里**  <- 只有这条能区分
+#     「拆干净了」和「各留一份」
+# --------------------------------------------------------------------------
+split = manifest.get('prompt_split') or {}
+notes_rel = split.get('archive')
+prompt_rel = split.get('prompt_copy')
+moved = split.get('moved_sections') or []
+notes_path = ROOT / notes_rel if notes_rel else None
+prompt_path = ROOT / prompt_rel if prompt_rel else None
+bad = []
+if not notes_rel or not prompt_rel:
+    ok, detail = False, 'manifest.prompt_split 缺 archive 或 prompt_copy —— 这条断言对着一份空声明会免费通过'
+elif len(moved) < 3:
+    ok, detail = False, (f'moved_sections 只登记了 {len(moved)} 条 —— 少于 3 条时这条断言基本是装饰，'
+                        f'而拆分最容易的失败方式就是「各留一份」')
+elif not notes_path.exists() or not prompt_path.exists():
+    ok, detail = False, f'{notes_rel} 或 {prompt_rel} 不在'
+else:
+    notes_text = notes_path.read_text(encoding='utf-8', errors='replace')
+    prompt_text = prompt_path.read_text(encoding='utf-8', errors='replace')
+    if len(notes_text.strip()) < 2000:
+        bad.append(f'{notes_rel} 只有 {len(notes_text.strip())} 字 —— 一份被抽空的档案和一份真档案在文件树上一样')
+    if notes_rel not in prompt_text:
+        bad.append(f'{prompt_rel} 正文里找不到 {notes_rel} —— **指路牌没了，档案就等于不存在**。重导出 prompt 抄本时忘了同步也会红在这里，那是有意的')
+    missing_moved = [s for s in moved if s not in notes_text]
+    if missing_moved:
+        bad.append(f'档案里缺 {len(missing_moved)}/{len(moved)} 节：{missing_moved}')
+    leaked = [s for s in moved if s in prompt_text]
+    if leaked:
+        bad.append(f'**搬走的小节还留在 prompt 抄本里**（{len(leaked)}/{len(moved)}）：{leaked}。各留一份是这类拆分最容易的失败方式，而它本来全绿')
+    ok = not bad
+    detail = (f'{len(moved)} 节全在 {notes_rel}（{len(notes_text.encode())} bytes）、一条都不在 {prompt_rel} 里，且指路牌在' if ok else '; '.join(bad))
+check('prompt_archive_split', '指令与档案拆分（负向那侧承重）', ok, detail)
 
 # --------------------------------------------------------------------------
 # manifest.invariants 与实际跑的检查，**集合相等**。
@@ -552,6 +596,8 @@ report = {
         'crossCopyPairs': len(pairs),
         'sharedWritebackRepos': expected_repo_count,
         'sharedWritebackWorkflows': expected_workflow_count,
+        'promptSplitMovedSections': len(moved),
+        'promptArchiveBytes': (len(notes_path.read_bytes()) if notes_path and notes_path.exists() else None),
         'openObligations': len(obligations),
         'checksVerify': actual_checks,
         'invariantsDeclared': len(declared_inv),
