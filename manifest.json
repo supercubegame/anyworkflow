@@ -76,7 +76,7 @@
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
     "verify.py": "ed16f6ed2532ac4032b0497e618ca815a98504d2",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
-    "agents/drift-devon.md": "427e7e7e08c29a6f2c345b5a3078775148bce9fc",
+    "agents/drift-devon.md": "c5a5f52732a41992913bbf3bb9deee0a9527b630",
     "agents/gate-audit-quinn.md": "59a14f884e491ff42cd51f49a20f54cf4d19f4e5",
     "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581"
   },
@@ -145,9 +145,9 @@
     "copies": {
       "agents/drift-devon.md": {
         "live": "ClickUp Super Agent: Drift Devon",
-        "readback_at": "2026-08-26T06:39:00Z",
+        "readback_at": "2026-08-26T12:06:43Z",
         "max_readback_age_days": 3,
-        "size_baseline_bytes": 4467,
+        "size_baseline_bytes": 6253,
         "kind": "full-prompt",
         "required_sections": [
           "### Name",
@@ -161,7 +161,9 @@
           "max_drill_age_days",
           "max_live_verify_age_days",
           "last_manual_run",
-          "heartbeat.json"
+          "heartbeat.json",
+          "Edit self",
+          "docs/QUINN-FIELD-NOTES.md"
         ]
       },
       "agents/gate-audit-quinn.md": {
