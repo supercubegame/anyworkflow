@@ -34,6 +34,7 @@
     "true_copy_readback_freshness": true,
     "confusables_blacklist": true,
     "cross_copy_consistency": true,
+    "shared_writeback_consumers_generated": true,
     "invariants_match_checks": true,
     "checks_count_equals": true
   },
@@ -63,13 +64,15 @@
     "docs/RESTORE-DRILL-0001.md": "78ee365ce8fac5f9eba692952da288ed5b650f7a",
     "docs/RESTORE-DRILL-TEMPLATE.md": "8a72ed13b5fc759ece1174af3f5b208eb944926e",
     "docs/SETUP-CHECKLIST.md": "4d2a94d09c833df45c3ae1fa98328c4c9e794c5c",
+    "docs/SHARED-WRITEBACK-CONSUMERS.md": "af71c562f1179debdd4851b3ef7d596ac8fa6940",
     "docs/STRANGER-WALKTHROUGH-0001.md": "6f626aa31178776825f0d94da229f637f91d3607",
     "docs/SUMMARY-TRIGGER-EVIDENCE-0001.md": "7c0ac5a9a4cb0e7d17cf1035efcbd2c240437536",
     "docs/VERIFY-EVIDENCE-0001.md": "aa14f38510b0d479717626729c73748beb86951a",
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
-    "verify.py": "01c0832eabcb296e76da01e6b4b9c14cafa3407a",
+    "verify.py": "2d2cfa2d12f6658c5ce95dd9095b6695717625af",
+    "manifest.json": "9fc5c5cdf410f39973cd3635f79d861b33fa8c23",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "add264c3a7fd0be3a88dd95a11b492d9bfd0feb0",
     "agents/gate-audit-quinn.md": "8e6076a61f5f1e8a3a646121ca28800982bb9ed6",
@@ -108,10 +111,12 @@
       "docs/RESTORE-DRILL-0001.md",
       "docs/RESTORE-DRILL-TEMPLATE.md",
       "docs/SETUP-CHECKLIST.md",
+      "docs/SHARED-WRITEBACK-CONSUMERS.md",
       "docs/STRANGER-WALKTHROUGH-0001.md",
       "docs/SUMMARY-TRIGGER-EVIDENCE-0001.md",
       "docs/VERIFY-EVIDENCE-0001.md",
       "docs/VERIFY-EVIDENCE-0002.md",
+      "manifest.json",
       "scripts/attest_delivery.py",
       "vendor/ci-workflows/report.yml",
       "verify.py"
@@ -125,7 +130,8 @@
     "报告里的哈希只印前 12 位。第一次登记 workflow 新哈希时我用那 12 位接上编的后 28 位，当场自查才改成从 API 读全值。教训：截断的标识符只能用来看，不能用来写。",
     "变异体别拷到 /tmp 去跑。verify.py 的 ROOT 是从 __file__ 推的，拷到 /tmp/mut.py 之后它去读 /tmp/manifest.json 然后崩掉 —— **而崩溃不是红**，看起来像变异体活下来了。就地改、跑完再复原。",
     "**顺序依赖的断言很难自己发现。** 同一次改动里我写了两条读运行时 checks 列表的断言，两条都因为「排在它之后的检查还没 append 进去」而看漏。两条都改成了扫源码。**判据一旦依赖代码顺序，它的覆盖面就不写在任何地方**，而它安静地小于你以为的范围。",
-    "verify.py、docs/MINIMAL-GATE.md、docs/CHANGELOG-BOOTSTRAP.md 这三份大文件当我整段重写时，存储字节会与本地不同（尺寸都变了）。现在登记的是存储字节：它冻住以后的漂移，而不假装此刻等于本地真源。"
+    "verify.py、docs/MINIMAL-GATE.md、docs/CHANGELOG-BOOTSTRAP.md 这三份大文件当我整段重写时，存储字节会与本地不同（尺寸都变了）。现在登记的是存储字节：它冻住以后的漂移，而不假装此刻等于本地真源。",
+    "SHARED-WRITEBACK-CONSUMERS 那条守卡上线第一次就抓住了写它的人：我先数成了 6 个仓 / 11 份 workflow，真值是 7 / 12。教训：『已知数量』也别手数，让生成器自己数。"
   ],
   "true_copies": {
     "_": "真抄本的四条断言。备份类需求里最值钱的一条是：一份空壳备份和一份完整备份，在文件树上长得一模一样。所以不断言「文件存在」（git 已经证明了，那是空断言）。",
@@ -212,7 +218,7 @@
   ],
   "_obligations": "带期限的义务。宽限期内只报剩多少天，过期判红。**到期只有两个正确反应，都不是把日期往后挑**：真的做完了（删记录），或者确认做不到（挑进 _tested_limits）。**做完了还挂着也判红** —— 一份挂着已完成事项的清单，没人会再读它。",
   "checks": {
-    "verify": 17
+    "verify": 18
   },
-  "_checks": "等号，不是下限。下限型的计数会自己漂。而它同时钉着 docs/MINIMAL-GATE.md 里那个数 —— 那句手写散文已经漂过一次。"
+  "_checks": "等号，不是下限。下限型的计数会自己漂。而它同时钉着 docs/MINIMAL-GATE.md 里那个数。这次从 17 变 18，就是因为新增了 shared_writeback_consumers_generated 那条。"
 }
