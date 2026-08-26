@@ -19,14 +19,25 @@
     "_upstream_ref": "共享回写 workflow 跟随上游主干（report.yml@main），和生态里其它消费者保持同一套策略。代价是上游改一行这边行为就变而闸门不会红，落点在外部观察者，不在本仓断言。"
   },
   "invariants": {
-    "agents_and_claude_match": true,
+    "rules_files_identical": true,
     "recovery_doc_exists": true,
     "blind_spots_doc_exists": true,
-    "not_backed_up_must_be_nonempty": true,
-    "writeback_marker_matches_workflow": true,
+    "not_backed_up_nonempty": true,
+    "manifest_top_keys": true,
+    "writeback_marker_pinned": true,
+    "composer_sentinel_pinned": true,
+    "blob_hash_selftest": true,
     "registered_files_byte_identical": true,
-    "registry_equals_directory": true
+    "registry_equals_directory": true,
+    "true_copy_anchors": true,
+    "true_copy_restore_sufficiency": true,
+    "true_copy_readback_freshness": true,
+    "confusables_blacklist": true,
+    "cross_copy_consistency": true,
+    "invariants_match_checks": true,
+    "checks_count_equals": true
   },
+  "_invariants": "键是每条检查的稳定 id，**与 verify.py 里实际的 check() 取用点集合相等**。在那之前这几个键从来没被读过 —— 它们看起来像一份声明，而实际上写什么都行。两侧都红：新加检查忘了登记红，删了检查而键还挂着也红。**用 id 而不用标题**：拿可读名字当键会让重命名变成承重操作。checks.verify 只数个数，看不见“是哪几条”；这一条比集合。",
   "docs_integrity": {
     ".github/workflows/verify.yml": "e4b45acf2050670c3e8241aa48bf8978b240360e",
     "AGENTS.md": "e16e3cafa8d916273b7b84b3b960b3d19cec93cc",
@@ -112,7 +123,8 @@
     "我读评论的通道会吞掉 HTML 注释，所以 marker 与 composer 哨兵在我眼里都是空的。能证明它们真在正文里的只有 attest。这正好是该有的分工，但也意味着我没法用肉眼替它做这件事。",
     "GitHub 评论的删除 / 编辑不在我的工具里。PR #14 上留着一条带 -x marker 的评论（#5418393988），它的正文中间含着真 marker。改成「认第一行」之后它不再影响判据，所以不需要删 —— 但如果以后真需要删一条评论，那是用户手动动作。",
     "报告里的哈希只印前 12 位。第一次登记 workflow 新哈希时我用那 12 位接上编的后 28 位，当场自查才改成从 API 读全值。教训：截断的标识符只能用来看，不能用来写。",
-    "变异体别拷到 /tmp 去跑。verify.py 的 ROOT 是从 __file__ 推的，拷到 /tmp/mut.py 之后它去读 /tmp/manifest.json 然后崩掉 —— **而崩溃不是红**，看起来像变异体活下来了。就地改、跑完再复原。"
+    "变异体别拷到 /tmp 去跑。verify.py 的 ROOT 是从 __file__ 推的，拷到 /tmp/mut.py 之后它去读 /tmp/manifest.json 然后崩掉 —— **而崩溃不是红**，看起来像变异体活下来了。就地改、跑完再复原。",
+    "**顺序依赖的断言很难自己发现。** 同一次改动里我写了两条读运行时 checks 列表的断言，两条都因为「排在它之后的检查还没 append 进去」而看漏。两条都改成了扫源码。**判据一旦依赖代码顺序，它的覆盖面就不写在任何地方**，而它安静地小于你以为的范围。"
   ],
   "true_copies": {
     "_": "真抄本的四条断言。备份类需求里最值钱的一条是：一份空壳备份和一份完整备份，在文件树上长得一模一样。所以不断言「文件存在」（git 已经证明了，那是空断言）。",
@@ -199,7 +211,7 @@
   ],
   "_obligations": "带期限的义务。宽限期内只报剩多少天，过期判红。**到期只有两个正确反应，都不是把日期往后挑**：真的做完了（删记录），或者确认做不到（挑进 _tested_limits）。**做完了还挂着也判红** —— 一份挂着已完成事项的清单，没人会再读它。",
   "checks": {
-    "verify": 16
+    "verify": 17
   },
   "_checks": "等号，不是下限。下限型的计数会自己漂。而它同时钉着 docs/MINIMAL-GATE.md 里那个数 —— 那句手写散文已经漂过一次。"
 }
