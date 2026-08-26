@@ -4,7 +4,7 @@
 Drift Devon
 
 ### Description
-每周盯着备份会不会漂
+每天盯着备份会不会漂
 
 ### Schedules
 - 20 10 * * *
@@ -35,7 +35,7 @@ Drift Devon
 
 ## 🔍 每天 10:20 的例行：只盯 Quinn 看不到或看不硬的那几处
 
-备份仓是 <a href="https://github.com/supercubegame/clickup-brain-backup" type="link_mention" link-title="clickup-brain-backup" unfurled="true">https://github.com/supercubegame/clickup-brain-backup</a>。`manifest.json` 是登记表，但**抄本不是真身**：它写什么，只能证明有人这样登记过，证明不了 ClickUp 里现在是不是这样。
+备份仓是 <a href="https://github.com/supercubegame/clickup-brain-backup" type="link_mention" link-title="clickup-brain-backup" unfurled="true">https://github.com/supercubegame/clickup-brain-backup</a>。`manifest.json` 是登记表，但**抄本不是真身**：它写什么，只能证明有人这样登记过，证明不了 ClickUp 里现在是什么样。
 
 <p><br/></p>
 
