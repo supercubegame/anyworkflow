@@ -11,25 +11,33 @@ manifest = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
 
 checks = []
 
-def check(title, ok, detail):
-    checks.append((title, ok, detail))
+# --------------------------------------------------------------------------
+# 每条检查带一个稳定 id。**id 才是承重的，标题可以随便改** ——
+# 拿可读名字当键会让「改个名」变成承重操作，而重命名应该是响亮的、
+# 不是静默的。id 与 manifest.invariants 的键集合必须相等（见文件末尾那条）。
+#
+# id 重复也要红：两条检查共用一个 id 的话，集合相等依然成立，
+# 而其中一条就无人登记了 —— 那是用集合当期望的经典漏网口。
+# --------------------------------------------------------------------------
+def check(cid, title, ok, detail):
+    checks.append((cid, title, ok, detail))
     print(("PASS" if ok else "FAIL") + f"  {title} | {detail}")
 
 agents = (ROOT / 'AGENTS.md').read_bytes()
 claude = (ROOT / 'CLAUDE.md').read_bytes()
-check('AGENTS.md 与 CLAUDE.md 逐字节相同', agents == claude, f'{len(agents)} bytes')
+check('rules_files_identical', 'AGENTS.md 与 CLAUDE.md 逐字节相同', agents == claude, f'{len(agents)} bytes')
 
 recovery_exists = (ROOT / 'docs' / 'RECOVERY.md').exists()
-check('恢复说明存在', recovery_exists, 'docs/RECOVERY.md')
+check('recovery_doc_exists', '恢复说明存在', recovery_exists, 'docs/RECOVERY.md')
 
 blind_exists = (ROOT / 'docs' / 'BLIND-SPOTS.md').exists()
-check('盲区清单存在', blind_exists, 'docs/BLIND-SPOTS.md')
+check('blind_spots_doc_exists', '盲区清单存在', blind_exists, 'docs/BLIND-SPOTS.md')
 
 nonempty = isinstance(manifest.get('not_backed_up'), list) and len(manifest['not_backed_up']) > 0
-check('not_backed_up 不是空数组', nonempty, f"count={len(manifest.get('not_backed_up', [])) if isinstance(manifest.get('not_backed_up'), list) else 'bad-type'}")
+check('not_backed_up_nonempty', 'not_backed_up 不是空数组', nonempty, f"count={len(manifest.get('not_backed_up', [])) if isinstance(manifest.get('not_backed_up'), list) else 'bad-type'}")
 
 missing = [k for k in ['purpose','backed_up','not_backed_up','invariants','writeback','docs_integrity'] if k not in manifest]
-check('manifest 顶层键齐全', len(missing) == 0, 'missing=' + (','.join(missing) if missing else 'none'))
+check('manifest_top_keys', 'manifest 顶层键齐全', len(missing) == 0, 'missing=' + (','.join(missing) if missing else 'none'))
 
 # --------------------------------------------------------------------------
 # 回写 marker 是一组耦合参数：workflow 传出去的那个，和 attest 回头去找的那个，
@@ -55,7 +63,7 @@ elif not declared:
 else:
     ok = found[0] == declared
     detail = f'workflow={found[0]!r} manifest={declared!r}'
-check('回写 marker：workflow 与 manifest 逐字相同', ok, detail)
+check('writeback_marker_pinned', '回写 marker：workflow 与 manifest 逐字相同', ok, detail)
 
 # --------------------------------------------------------------------------
 # composer 哨兵是第二组耦合参数：compose-report.mjs 往评论里写的那串，和
@@ -86,7 +94,7 @@ elif len(composer_hits) != 1 or len(attest_hits) != 1:
 else:
     ok = composer_hits[0] == attest_hits[0]
     detail = f'composer={composer_hits[0]!r} attest={attest_hits[0]!r}'
-check('composer 哨兵：写入方与核对方逐字相同', ok, detail)
+check('composer_sentinel_pinned', 'composer 哨兵：写入方与核对方逐字相同', ok, detail)
 
 # --------------------------------------------------------------------------
 # 承重文件的逐字节身份。
@@ -117,7 +125,7 @@ def git_blob(raw):
     return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
 
 integrity = manifest.get('docs_integrity') or {}
-check('blob 哈希函数自证（git 空 blob 常量）',
+check('blob_hash_selftest', 'blob 哈希函数自证（git 空 blob 常量）',
       git_blob(b'') == EMPTY_BLOB, f'空 blob = {git_blob(b"")}')
 
 bad = []
@@ -137,7 +145,7 @@ else:
     ok = not bad
     detail = (f'{len(integrity)} 份全部逐字节相同' if ok
               else '; '.join(bad))
-check('承重文件逐字节身份（blob 哈希）', ok, detail)
+check('registered_files_byte_identical', '承重文件逐字节身份（blob 哈希）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 清单即期望，双向。手写清单永远追不上目录：新加一份文档而忘了登记，
@@ -159,7 +167,7 @@ ok = not missing_reg and not ghost_reg
 dirs_label = ' · '.join(d + '/' for d in REGISTERED_DIRS)
 detail = (f'{dirs_label} 共 {len(on_disk)} 份，登记集合完全重合' if ok else
           f'未登记：{missing_reg or "无"} · 登记了但不存在：{ghost_reg or "无"}')
-check(f'登记表与目录集合相等（{dirs_label}）', ok, detail)
+check('registry_equals_directory', f'登记表与目录集合相等（{dirs_label}）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 真抄本的四条断言。这一组补的是 MINIMAL-GATE 里明写的「不守 6」：
@@ -171,11 +179,11 @@ check(f'登记表与目录集合相等（{dirs_label}）', ok, detail)
 #   逐字节身份 -> 上面那条 blob 哈希
 #   正文锚点  -> 下面第一条（防空壳：哈希换了但内容被整段抽空）
 #   恢复充分性 -> 下面第二条（恢复这个 agent 需要哪几节，逐个非空）
-#   新鲜度    -> 下面第三条（读回时间戒30 天期限）
+#   新鲜度    -> 下面第三条（读回时间戳 30 天期限）
 #
 # **为什么还需要锚点，哈希不够吗？** 哈希只能说「文件变了」。一次正当的重导出
 # 会让哈希变，而那时候重算登记值是对的 —— 但如果那次「重导出」其实是一份
-# 被抽空的壳子，重算登记值后门门照样全绿。锚点守的是那一刻。
+# 被抽空的壳子，重算登记值后闸门照样全绿。锚点守的是那一刻。
 # --------------------------------------------------------------------------
 true_copies = manifest.get('true_copies') or {}
 copies = (true_copies.get('copies') or {})
@@ -202,7 +210,7 @@ if not copies:
 else:
     ok = not bad
     detail = (f'{len(copies)} 份抄本共 {anchor_total} 条锚点全部命中' if ok else '; '.join(bad))
-check('真抄本正文锚点（逐条命中）', ok, detail)
+check('true_copy_anchors', '真抄本正文锚点（逐条命中）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 恢复充分性。「恢复这个 agent 需要哪几个字段」列出来，逐个断言非空。
@@ -238,7 +246,7 @@ for rel in sorted(copies):
 ok = bool(copies) and not bad
 detail = (f'{len(copies)} 份抄本共 {section_total} 个必需小节全部非空' if ok
           else ('; '.join(bad) if bad else 'copies 为空'))
-check('真抄本恢复充分性（必需小节非空）', ok, detail)
+check('true_copy_restore_sufficiency', '真抄本恢复充分性（必需小节非空）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 新鲜度。备份最常见的死法是悄悄过期。
@@ -283,13 +291,13 @@ else:
     oldest = max(ages, key=lambda x: x[1]) if ages else None
     detail = ((f'最旧那份 {oldest[0]} 已 {oldest[1]:.1f} 天，还剩 {max_age - oldest[1]:.1f} 天'
                f'（上限 {max_age}）') if ok else '; '.join(bad))
-check('真抄本读回新鲜度（带期限）', ok, detail)
+check('true_copy_readback_freshness', '真抄本读回新鲜度（带期限）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 形近错字黑名单。**这一条守的是我自己反复踩的坑（次数记在 _tested_limits）。**
 #
 # 根因定位了，而且不在任何存储通道上：我往文件里写中文时会敲成形近字，
-# 而且**字节长度不变**，于是体积与关键字类检查全部看不见。
+# 而且**字节长度不变**，于是体积与关键字类检查全部看不见。已知现场：
 # 最贵的一处：一份讲「别安静地说谎」的文档，那两个字被换成了形近字，
 # 于是一句话当场失去意义，而没有任何东西会喊。具体现场与次数记在
 # manifest._tested_limits 里（那里可以安全地引用错字，JSON 不被本扫描剥注释
@@ -346,7 +354,7 @@ else:
     ok = not found
     detail = (f'扫了 {len(scanned)} 份，{len(CONFUSABLES)} 项黑名单 0 命中' if ok
               else '; '.join(found))
-check('形近错字黑名单（负向扫描）', ok, detail)
+check('confusables_blacklist', '形近错字黑名单（负向扫描）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 跨抄本一致性。**两份抄本各自都是忠实的读回，而它们互相矛盾** ——
@@ -423,7 +431,65 @@ if not pairs:
 else:
     ok = not bad
     detail = ('; '.join(notes_cc) if ok else '; '.join(bad))
-check('跨抄本一致性（不一致必须有带期限的义务）', ok, detail)
+check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期限的义务）', ok, detail)
+
+# --------------------------------------------------------------------------
+# manifest.invariants 与实际跑的检查，**集合相等**。
+#
+# 这一条补的是一个很丑的洞：`invariants` 那几个键从来没被读过。
+# 它们看起来像一份「本仓守住了哪些不变式」的声明，而实际上只是装饰：
+# **写什么都行，写错也行，删光也行。**
+#
+# 上面那条总数等号只数个数，它看不见「是哪几条」。删一条、加一条，
+# 总数不变就不会红。所以这里比的是**集合**。
+#
+# 它两侧都红：
+#   新加一条检查而忘了登记 -> 红（新增默认不通过，方向才是对的）
+#   删了一条检查而键还挂着 -> 红（一条声明守着一个不存在的东西）
+#
+# **键用的是 id，不是标题。** 拿可读名字当键的话，重命名会变成承重操作 ——
+# 而改个描述应该是自由的。
+#
+# **这一条自己也要登记**（id 就在下面），否则它会把自己当成未登记项而当场红。
+# 那是又一个自指回环，而这个回环在本仓里已经出现过三次。
+# --------------------------------------------------------------------------
+declared_inv = set((manifest.get('invariants') or {}).keys())
+
+# **id 从源码里扫，不从运行时的 checks 里拿。**
+#
+# 第一版拿的是运行时列表，而它当场就漏了一条：排在本条之后的检查还没
+# append 进去，于是它看不见。**一条看不见部分目标的断言，对那一部分而言是空的**，
+# 而且它的覆盖面安静地取决于代码顺序 —— 那是最难查的那种依赖。
+#
+# 改成扫源码里的 `check('<id>'` 真取用点：不依赖执行顺序，新加一条无论插在
+# 哪里都看得见。而剥注释后先自证：扫不到任何 id 就直接红，
+# 否则正则写歪的话它会得到一个空集合，而空集合与声明集合只在声明也空时相等。
+SELF = ROOT / 'verify.py'
+self_code = strip_comments(SELF.read_text(encoding='utf-8'), ('#',))
+scanned_ids = re.findall(r"^[ \t]*check\(\s*'([a-z0-9_]+)'", self_code, re.M)
+dup_ids = sorted({i for i in scanned_ids if scanned_ids.count(i) > 1})
+actual_inv = set(scanned_ids)
+unregistered = sorted(actual_inv - declared_inv)
+orphaned = sorted(declared_inv - actual_inv)
+
+if not scanned_ids:
+    ok, detail = False, ('从源码里一个 check id 都没扫到 —— 正则写歪了，'
+                        '而空集合会让这条断言对着一份空声明免费通过')
+elif 'invariants_match_checks' not in actual_inv:
+    ok, detail = False, ('扫到的 id 里没有本条自己 —— 正向对照失败，'
+                        '扫描结果不可信')
+elif dup_ids:
+    ok, detail = False, (f'有 {len(dup_ids)} 个 id 重复：{dup_ids} —— 集合相等依然成立，'
+                         f'而其中一条就无人登记了')
+elif not declared_inv:
+    ok, detail = False, 'manifest.invariants 是空的 —— 空声明让这条断言当场变空'
+elif unregistered or orphaned:
+    ok, detail = False, (f'未登记的检查：{unregistered or "无"} · '
+                         f'登记了但没有对应检查：{orphaned or "无"}。'
+                         f'**修法是两边对齐，不是把声明删成空的**')
+else:
+    ok, detail = True, f'{len(actual_inv)} 条检查与声明集合完全重合（按 id 从源码扫，不按标题、不按顺序）'
+check('invariants_match_checks', 'manifest.invariants 与实际检查集合相等', ok, detail)
 
 # --------------------------------------------------------------------------
 # 检查总数的等号断言，以及 MINIMAL-GATE 里那个数字。
@@ -436,6 +502,11 @@ check('跨抄本一致性（不一致必须有带期限的义务）', ok, detail
 # 所以给它配一条交叉核对：真值就在同一个仓里（登记值），所以这条做得成。
 #
 # 这一条自己也计入总数，所以期望值是 len(checks) + 1。
+#
+# **那个 +1 假设了它是最后一条，而这个假设已经破过一次**：新增 invariants
+# 那条时它被插到了后面，于是这里算 16 而实际跑了 17。
+# **修法不是把 +1 改成 +2** —— 那是一个手写偏移量，下次还会漂。
+# 正确修法是把这一条真的排到最后，而下面有一句自证在守这件事。
 # --------------------------------------------------------------------------
 declared_checks = ((manifest.get('checks') or {}).get('verify'))
 actual_checks = len(checks) + 1
@@ -453,19 +524,35 @@ elif str(actual_checks) not in gate_text:
                          f'那句「守哪几件事」已经不成立了')
 else:
     ok, detail = True, f'{actual_checks} 条，登记值与 MINIMAL-GATE 里那个数都对上了'
-check('检查总数（等号）与 MINIMAL-GATE 里那个数', ok, detail)
+check('checks_count_equals', '检查总数（等号）与 MINIMAL-GATE 里那个数', ok, detail)
 
 # --------------------------------------------------------------------------
 # 报告落盘。它不是断言，是让这条闸门的结论走得出这个 job —— Actions 的运行
 # 日志读不到，所以逐项结果要变成 artifact，再由共享回写 workflow 合成评论。
 # --------------------------------------------------------------------------
-failures = [f'{t} | {d}' for t, ok_, d in checks if not ok_]
+# **自证：计数那一条必须是源码里最后一条。** 它用 len(checks)+1 做期望值，
+# 而那个 +1 只在它排在末尾时成立。
+#
+# **第一版这里读的是运行时 checks[-1]，而它当场没抓住变异体** ——
+# 因为新插的那条排在本守卡之后，本守卡跑的时候它还没 append 进去。
+# **同一个顺序依赖的病，在同一次改动里犯了两次。** 改成扫源码：
+# 最后一个 check() 取用点必须是它，与执行顺序无关。
+#
+# （那一轮并不是完全没人看见：invariants 集合相等那条把它拓住了。
+# 但一条本该自己守住的守卡靠别人救场，那就是个空守卡。）
+if scanned_ids and scanned_ids[-1] != 'checks_count_equals':
+    checks.append(('checks_count_last', '计数那一条必须排在最后', False,
+                   f'源码里最后一个 check 是 {scanned_ids[-1]!r} —— len(checks)+1 那个偏移量'
+                   f'已经不成立。**把新检查移到计数那一条之前，不要改偏移量**'))
+    print('FAIL  计数那一条必须排在最后 | ' + checks[-1][3])
+
+failures = [f'{t} | {d}' for _, t, ok_, d in checks if not ok_]
 report = {
     'gate': 'backup',
     'passed': len(checks) - len(failures),
     'total': len(checks),
     'failures': failures,
-    'checks': [{'title': t, 'ok': ok_, 'detail': d} for t, ok_, d in checks],
+    'checks': [{'id': i, 'title': t, 'ok': ok_, 'detail': d} for i, t, ok_, d in checks],
     'metrics': {
         'rulesBytes': len(agents),
         'notBackedUpCount': len(manifest.get('not_backed_up', []) or []),
@@ -488,6 +575,8 @@ report = {
         'crossCopyPairs': len(pairs),
         'openObligations': len(obligations),
         'checksVerify': actual_checks,
+        'invariantsDeclared': len(declared_inv),
+        'invariantIds': sorted(actual_inv),
     },
 }
 ARTIFACTS.mkdir(exist_ok=True)
