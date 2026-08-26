@@ -39,15 +39,6 @@ check('not_backed_up_nonempty', 'not_backed_up 不是空数组', nonempty, f"cou
 missing = [k for k in ['purpose','backed_up','not_backed_up','invariants','writeback','docs_integrity'] if k not in manifest]
 check('manifest_top_keys', 'manifest 顶层键齐全', len(missing) == 0, 'missing=' + (','.join(missing) if missing else 'none'))
 
-# --------------------------------------------------------------------------
-# 回写 marker 是一组耦合参数：workflow 传出去的那个，和 attest 回头去找的那个，
-# 必须逐字相同。真源在 manifest.writeback.marker —— attest 从那里读（真取用点），
-# 这条断言把 workflow 里那一行钉在同一个值上。改一处忘了另一处，两个方向都红。
-#
-# 扫描前先剥掉注释行：下面这段解释文字里就出现过 marker 这个词，而
-# 「某段里有没有 X」不先切段就找，会同时制造漏报和误报。剥完先自证还剩真东西，
-# 剥成空字符串的话后面这条会免费通过。
-# --------------------------------------------------------------------------
 WF_PATH = ROOT / '.github' / 'workflows' / 'verify.yml'
 wf_raw = WF_PATH.read_text(encoding='utf-8')
 wf_code = '\n'.join(l for l in wf_raw.splitlines() if not l.lstrip().startswith('#'))
@@ -65,16 +56,6 @@ else:
     detail = f'workflow={found[0]!r} manifest={declared!r}'
 check('writeback_marker_pinned', '回写 marker：workflow 与 manifest 逐字相同', ok, detail)
 
-# --------------------------------------------------------------------------
-# composer 哨兵是第二组耦合参数：compose-report.mjs 往评论里写的那串，和
-# attest_delivery.py 回头找的那串，必须逐字相同。它承重的原因是共享回写
-# workflow 的**兜底评论也带着同一个 marker** —— 分开「完整报告」与「没有逐项
-# 证据的兜底」，全靠这个哨兵。两边漂开的话 attest 会把每一次完整报告都判成
-# 说不清，或者更糟：把兜底读成完整。
-#
-# 这条断言自己不持有那个字面量，它从两个真取用点各抄一次再比 —— 整段重写
-# 弄丢一处，另一处还在用它，当场红。
-# --------------------------------------------------------------------------
 SENTINEL_RE = re.compile(r"^[ \t]*(?:const[ \t]+)?COMPOSER_SENTINEL[ \t]*=[ \t]*'([^']+)'", re.M)
 
 def strip_comments(text, tokens):
@@ -96,9 +77,6 @@ else:
     detail = f'composer={composer_hits[0]!r} attest={attest_hits[0]!r}'
 check('composer_sentinel_pinned', 'composer 哨兵：写入方与核对方逐字相同', ok, detail)
 
-# --------------------------------------------------------------------------
-# 承重文件的逐字节身份。
-# --------------------------------------------------------------------------
 EMPTY_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
 REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows')
 
@@ -128,27 +106,19 @@ else:
               else '; '.join(bad))
 check('registered_files_byte_identical', '承重文件逐字节身份（blob 哈希）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 清单即期望，双向。
-# --------------------------------------------------------------------------
 on_disk = set()
 for d in REGISTERED_DIRS:
     for f in sorted((ROOT / d).glob('*')):
         if f.is_file():
             on_disk.add(f'{d}/{f.name}')
-declared_reg = {k for k in integrity
-                if any(k.startswith(d + '/') for d in REGISTERED_DIRS)}
+declared_reg = {k for k in integrity if any(k.startswith(d + '/') for d in REGISTERED_DIRS)}
 missing_reg = sorted(on_disk - declared_reg)
 ghost_reg = sorted(declared_reg - on_disk)
 ok = not missing_reg and not ghost_reg
 dirs_label = ' · '.join(d + '/' for d in REGISTERED_DIRS)
-detail = (f'{dirs_label} 共 {len(on_disk)} 份，登记集合完全重合' if ok else
-          f'未登记：{missing_reg or "无"} · 登记了但不存在：{ghost_reg or "无"}')
+detail = (f'{dirs_label} 共 {len(on_disk)} 份，登记集合完全重合' if ok else f'未登记：{missing_reg or "无"} · 登记了但不存在：{ghost_reg or "无"}')
 check('registry_equals_directory', f'登记表与目录集合相等（{dirs_label}）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 真抄本的四条断言。
-# --------------------------------------------------------------------------
 true_copies = manifest.get('true_copies') or {}
 copies = (true_copies.get('copies') or {})
 
@@ -203,14 +173,9 @@ for rel in sorted(copies):
         if not ''.join(body).strip():
             bad.append(f'{rel}：小节 {head!r} 在，但内容是空的')
 ok = bool(copies) and not bad
-detail = (f'{len(copies)} 份抄本共 {section_total} 个必需小节全部非空' if ok
-          else ('; '.join(bad) if bad else 'copies 为空'))
+detail = (f'{len(copies)} 份抄本共 {section_total} 个必需小节全部非空' if ok else ('; '.join(bad) if bad else 'copies 为空'))
 check('true_copy_restore_sufficiency', '真抄本恢复充分性（必需小节非空）', ok, detail)
 
-# 期限现在**可以按抄本收紧，但不许放宽**。理由是一次真事故（见 _tested_limits）：
-# 一个能编辑自己的 agent 在 9 天里把自己的 prompt 重写掉了七成八，而全局 30 天
-# 的期限意味着它有整整一个月可以隐形地改自己。**收紧一条上限是修复，放宽一条
-# 上限是把断言改成装饰**,所以覆盖值比全局更松时这条直接判红。
 max_age = true_copies.get('max_readback_age_days')
 valid_max_age = isinstance(max_age, int) and not isinstance(max_age, bool) and max_age > 0
 now = datetime.now(timezone.utc)
@@ -226,8 +191,7 @@ for rel in sorted(copies):
             bad.append(f'{rel}：读回期限覆盖值不是正整数：{override!r}')
             continue
         if valid_max_age and override > max_age:
-            bad.append(f'{rel}：覆盖值 {override} 天比全局上限 {max_age} 天更松 ——'
-                       f' **覆盖只许更严**，放宽一条上限等于亲手把断言改成装饰')
+            bad.append(f'{rel}：覆盖值 {override} 天比全局上限 {max_age} 天更松 —— **覆盖只许更严**，放宽一条上限等于亲手把断言改成装饰')
             continue
         limit = override
     limits[rel] = limit
@@ -253,33 +217,14 @@ elif not copies:
 else:
     ok = not bad
     tightest = min((a for a in ages), key=lambda x: x[2] - x[1]) if ages else None
-    detail = ((f'最吃紧那份 {tightest[0]} 已 {tightest[1]:.1f} 天，还剩'
-               f' {tightest[2] - tightest[1]:.1f} 天（它的上限 {tightest[2]}，全局 {max_age}）') if ok
-              else '; '.join(bad))
+    detail = ((f'最吃紧那份 {tightest[0]} 已 {tightest[1]:.1f} 天，还剩 {tightest[2] - tightest[1]:.1f} 天（它的上限 {tightest[2]}，全局 {max_age}）') if ok else '; '.join(bad))
 check('true_copy_readback_freshness', '真抄本读回新鲜度（按抄本可收紧的期限）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 真抄本体积下限：**抄本不许悄悄缩水**。
-#
-# 这一条是被一次真事故逼出来的，而它暴露的洞是前面那几条合起来也看不见的：
-# 一份被抽空七成八的抄本，如果登记的哈希在同一次提交里跟着改了，
-# **逐字节身份那条会全绿** —— 它守的是「有没有人偷偷改过存储字节」，
-# 不是「这份抄本还是不是原来那份东西」。锚点那条能抓到一部分（删掉整节会失配），
-# 但锚点只覆盖被登记的那几句，一次「保留骨架、掏空细节」的重写完全躲得过。
-#
-# 所以这里给每份抄本登记一个**高水位**，并且两侧都能红：
-#   - 掉到高水位的 (1 - max_shrink_ratio) 以下 -> 红。想接受这次缩水，
-#     只能显式把 baseline 改下去 —— 那是一次写在 diff 里、看得见的动作。
-#   - 长到高水位之上 -> 也红，要求把水位抬上来。**不抬的话这个水位会慢慢
-#     变得抓不住任何东西**，那正是「下限型的计数会自己漂」那条病。
-#   - 容差本身有上下界：写成 0.9 会放走掉九成的抄本，写成 0 则是一台假红工厂。
-# --------------------------------------------------------------------------
 shrink_ratio = true_copies.get('max_shrink_ratio')
 bad = []
 notes_sz = []
 if not isinstance(shrink_ratio, float) or not (0.0 < shrink_ratio <= 0.5):
-    ok, detail = False, (f'max_shrink_ratio 必须是 (0, 0.5] 区间的浮点数：{shrink_ratio!r} ——'
-                         f' 太大会放走被抽空的抄本，太小则是一台假红工厂')
+    ok, detail = False, (f'max_shrink_ratio 必须是 (0, 0.5] 区间的浮点数：{shrink_ratio!r} —— 太大会放走被抽空的抄本，太小则是一台假红工厂')
 elif not copies:
     ok, detail = False, 'copies 为空 —— 空登记表让这条断言当场变空'
 else:
@@ -288,8 +233,7 @@ else:
         base = spec.get('size_baseline_bytes')
         target = ROOT / rel
         if not (isinstance(base, int) and not isinstance(base, bool) and base > 0):
-            bad.append(f'{rel}：没登记 size_baseline_bytes 或不是正整数：{base!r} ——'
-                       f' 缺了它这条断言对这一份就是空的')
+            bad.append(f'{rel}：没登记 size_baseline_bytes 或不是正整数：{base!r} —— 缺了它这条断言对这一份就是空的')
             continue
         if not target.exists():
             bad.append(f'{rel}：登记了但文件不在')
@@ -297,22 +241,15 @@ else:
         cur = len(target.read_bytes())
         floor = int(base * (1.0 - shrink_ratio))
         if cur < floor:
-            bad.append(f'{rel}：现在 {cur} 字节，低于下限 {floor}（高水位 {base}，'
-                       f'容差 {int(shrink_ratio * 100)}%），缩水 {100 - cur * 100 // base}%。'
-                       f'**一份被抽空的抄本和一次正当精简长得一样**，所以改 baseline 必须是显式动作')
+            bad.append(f'{rel}：现在 {cur} 字节，低于下限 {floor}（高水位 {base}，容差 {int(shrink_ratio * 100)}%），缩水 {100 - cur * 100 // base}%。**一份被抽空的抄本和一次正当精简长得一样**，所以改 baseline 必须是显式动作')
         elif cur > base:
-            bad.append(f'{rel}：现在 {cur} 字节，高于高水位 {base} —— 把 baseline 抬到 {cur}，'
-                       f'否则这个水位会慢慢变得抓不住任何东西')
+            bad.append(f'{rel}：现在 {cur} 字节，高于高水位 {base} —— 把 baseline 抬到 {cur}，否则这个水位会慢慢变得抓不住任何东西')
         else:
             notes_sz.append(f'{rel}：{cur}/{base}（下限 {floor}）')
     ok = not bad
-    detail = (f'{len(copies)} 份抄本体积都在高水位与下限之间（容差 {int(shrink_ratio * 100)}%）：'
-              + ' · '.join(notes_sz)) if ok else '; '.join(bad)
+    detail = (f'{len(copies)} 份抄本体积都在高水位与下限之间（容差 {int(shrink_ratio * 100)}%）：' + ' · '.join(notes_sz)) if ok else '; '.join(bad)
 check('true_copy_size_floor', '真抄本体积下限（高水位 + 缩水容差，两侧都红）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 形近错字黑名单。
-# --------------------------------------------------------------------------
 CONFUSABLES = {
     '\u62c4\u672c': '\u6284\u672c',
     '\u8bf4\u8c01': '\u8bf4\u8c0e',
@@ -349,13 +286,9 @@ elif not scanned:
     ok, detail = False, '一份文件都没扫到 —— 这条断言当场变空'
 else:
     ok = not found
-    detail = (f'扫了 {len(scanned)} 份，{len(CONFUSABLES)} 项黑名单 0 命中' if ok
-              else '; '.join(found))
+    detail = (f'扫了 {len(scanned)} 份，{len(CONFUSABLES)} 项黑名单 0 命中' if ok else '; '.join(found))
 check('confusables_blacklist', '形近错字黑名单（负向扫描）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 跨抄本一致性。
-# --------------------------------------------------------------------------
 def section_value(path, head):
     if not path.exists():
         return None
@@ -413,18 +346,6 @@ else:
     detail = ('; '.join(notes_cc) if ok else '; '.join(bad))
 check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期限的义务）', ok, detail)
 
-# --------------------------------------------------------------------------
-# 共享回写 workflow 的消费者集合，**由生成物供给散文**。
-#
-# DEPENDENCIES.md 现在比从前诚实得多：它写的是**一次真读回**。但它仍然是手写台账，
-# 而手写清单永远追不上目录。第一次漏的是 flappycat，第二次漏的是 crossyroad。
-#
-# 所以这里反过来一把：不再让散文自己声明「有哪些消费者」，让它**指向一份生成物**。
-# 新增一个 workflow 而忘了更新这份生成物 -> 红。生成物和散文不一致 -> 红。
-#
-# 这里故意只守「共享回写 workflow 的消费者」这一层，不泛化成「所有 workflow」：
-# 那样会把不相关的流水线也卷进来，变成一条大而空的断言。
-# --------------------------------------------------------------------------
 CONSUMER_FILES = {
     'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml'],
     'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
@@ -462,24 +383,9 @@ if actual is None:
     ok, detail = False, 'docs/SHARED-WRITEBACK-CONSUMERS.md 不存在 —— 散文又会退回成手写记忆'
 else:
     ok = actual == generated
-    detail = (f'{expected_repo_count} 个仓库 / {expected_workflow_count} 份 workflow，生成物与登记完全一致' if ok
-              else '生成物与当前登记不一致 —— 新增/删改了消费者但没同步这份文件')
+    detail = (f'{expected_repo_count} 个仓库 / {expected_workflow_count} 份 workflow，生成物与登记完全一致' if ok else '生成物与当前登记不一致 —— 新增/删改了消费者但没同步这份文件')
 check('shared_writeback_consumers_generated', '共享回写消费者生成物与登记相等', ok, detail)
 
-# --------------------------------------------------------------------------
-# 指令 / 档案的拆分守卫，**负向那侧是承重的**。
-#
-# Quinn 的 prompt 长到 30948 字节之后被自己重写掉了七成八，所以它按「指令 / 档案」
-# 拆开了：prompt 只留铁律与判据，案例史搬进 docs/QUINN-FIELD-NOTES.md。
-#
-# 光断言「档案文件存在且不空」是空的 —— **复制一份留两处同样通过**，然后两边
-# 各自长歪而没有任何东西看得见。所以四件一起断，而承重的是最后两条：
-#   - 档案存在且不空
-#   - prompt 抄本真的指向档案（正向对照；它也让「忘了重导出」当场红）
-#   - 搬走的那几节标题**全都在档案里**
-#   - 搬走的那几节标题**一条都不在 prompt 抄本里**  <- 只有这条能区分
-#     「拆干净了」和「各留一份」
-# --------------------------------------------------------------------------
 split = manifest.get('prompt_split') or {}
 notes_rel = split.get('archive')
 prompt_rel = split.get('prompt_copy')
@@ -490,8 +396,7 @@ bad = []
 if not notes_rel or not prompt_rel:
     ok, detail = False, 'manifest.prompt_split 缺 archive 或 prompt_copy —— 这条断言对着一份空声明会免费通过'
 elif len(moved) < 3:
-    ok, detail = False, (f'moved_sections 只登记了 {len(moved)} 条 —— 少于 3 条时这条断言基本是装饰，'
-                        f'而拆分最容易的失败方式就是「各留一份」')
+    ok, detail = False, (f'moved_sections 只登记了 {len(moved)} 条 —— 少于 3 条时这条断言基本是装饰，而拆分最容易的失败方式就是「各留一份」')
 elif not notes_path.exists() or not prompt_path.exists():
     ok, detail = False, f'{notes_rel} 或 {prompt_rel} 不在'
 else:
@@ -507,13 +412,17 @@ else:
     leaked = [s for s in moved if s in prompt_text]
     if leaked:
         bad.append(f'**搬走的小节还留在 prompt 抄本里**（{len(leaked)}/{len(moved)}）：{leaked}。各留一份是这类拆分最容易的失败方式，而它本来全绿')
+    archive_anchors = split.get('archive_anchors') or []
+    if len(archive_anchors) < len(moved):
+        bad.append(f'archive_anchors 只登记了 {len(archive_anchors)} 条，而搬走了 {len(moved)} 节 —— **锚点要跟着那一节走**，拆分不是删锚点的理由')
+    else:
+        miss_a = [a for a in archive_anchors if a not in notes_text]
+        if miss_a:
+            bad.append(f'档案锚点失配 {len(miss_a)}/{len(archive_anchors)} 条：{miss_a}')
     ok = not bad
-    detail = (f'{len(moved)} 节全在 {notes_rel}（{len(notes_text.encode())} bytes）、一条都不在 {prompt_rel} 里，且指路牌在' if ok else '; '.join(bad))
+    detail = (f'{len(moved)} 节全在 {notes_rel}（{len(notes_text.encode())} bytes）、一条都不在 {prompt_rel} 里，指路牌在，档案 {len(archive_anchors)} 条锚点全部命中' if ok else '; '.join(bad))
 check('prompt_archive_split', '指令与档案拆分（负向那侧承重）', ok, detail)
 
-# --------------------------------------------------------------------------
-# manifest.invariants 与实际跑的检查，**集合相等**。
-# --------------------------------------------------------------------------
 declared_inv = set((manifest.get('invariants') or {}).keys())
 SELF = ROOT / 'verify.py'
 self_code = strip_comments(SELF.read_text(encoding='utf-8'), ('#',))
@@ -537,9 +446,6 @@ else:
     ok, detail = True, f'{len(actual_inv)} 条检查与声明集合完全重合（按 id 从源码扫，不按标题、不按顺序）'
 check('invariants_match_checks', 'manifest.invariants 与实际检查集合相等', ok, detail)
 
-# --------------------------------------------------------------------------
-# 检查总数的等号断言，以及 MINIMAL-GATE 里那个数字。
-# --------------------------------------------------------------------------
 declared_checks = ((manifest.get('checks') or {}).get('verify'))
 actual_checks = len(checks) + 1
 gate_doc = ROOT / 'docs' / 'MINIMAL-GATE.md'
@@ -556,12 +462,8 @@ else:
     ok, detail = True, f'{actual_checks} 条，登记值与 MINIMAL-GATE 里那个数都对上了'
 check('checks_count_equals', '检查总数（等号）与 MINIMAL-GATE 里那个数', ok, detail)
 
-# --------------------------------------------------------------------------
-# 报告落盘。
-# --------------------------------------------------------------------------
 if scanned_ids and scanned_ids[-1] != 'checks_count_equals':
-    checks.append(('checks_count_last', '计数那一条必须排在最后', False,
-                   f'源码里最后一个 check 是 {scanned_ids[-1]!r} —— len(checks)+1 那个偏移量已经不成立。**把新检查移到计数那一条之前，不要改偏移量**'))
+    checks.append(('checks_count_last', '计数那一条必须排在最后', False, f'源码里最后一个 check 是 {scanned_ids[-1]!r} —— len(checks)+1 那个偏移量已经不成立。**把新检查移到计数那一条之前，不要改偏移量**'))
     print('FAIL  计数那一条必须排在最后 | ' + checks[-1][3])
 
 failures = [f'{t} | {d}' for _, t, ok_, d in checks if not ok_]
@@ -597,6 +499,7 @@ report = {
         'sharedWritebackRepos': expected_repo_count,
         'sharedWritebackWorkflows': expected_workflow_count,
         'promptSplitMovedSections': len(moved),
+        'promptSplitArchiveAnchors': len(split.get('archive_anchors') or []),
         'promptArchiveBytes': (len(notes_path.read_bytes()) if notes_path and notes_path.exists() else None),
         'openObligations': len(obligations),
         'checksVerify': actual_checks,
@@ -605,8 +508,7 @@ report = {
     },
 }
 ARTIFACTS.mkdir(exist_ok=True)
-(ARTIFACTS / 'verify-report.json').write_text(
-    json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+(ARTIFACTS / 'verify-report.json').write_text(json.dumps(report, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 print(f"\n共执行 {len(checks)} 条检查，通过 {len(checks)-len(failures)}，失败 {len(failures)}")
 print('报告已写入 artifacts/verify-report.json')
