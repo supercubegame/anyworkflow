@@ -74,7 +74,7 @@
     "verify.py": "2d2cfa2d12f6658c5ce95dd9095b6695717625af",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "add264c3a7fd0be3a88dd95a11b492d9bfd0feb0",
-    "agents/gate-audit-quinn.md": "61d3f48c2a934bb1eeacdc2c49e4e387f8ce390b",
+    "agents/gate-audit-quinn.md": "5dd6267d2ffaab0d367d148c8cde9aa0fdfca299",
     "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。",
@@ -158,7 +158,7 @@
       },
       "agents/gate-audit-quinn.md": {
         "live": "ClickUp Super Agent: 闸门审计 Quinn",
-        "readback_at": "2026-08-26T05:54:00Z",
+        "readback_at": "2026-08-26T06:24:00Z",
         "kind": "full-prompt",
         "required_sections": [
           "### Name",
