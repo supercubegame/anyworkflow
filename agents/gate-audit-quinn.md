@@ -124,7 +124,7 @@
 
 <p><br/></p>
 
-Devon 现在的 `### Schedules` 是 `20 10 * * *`。如果 Quinn 之后再把它按别的 cron 去比，那就是 Quinn 自己的认知漂了。Devon 自己的 Description 还写着“每周盯着备份会不会漂”，而正文早就是每天 10:20 的例行。
+Devon 现在的 `### Schedules` 是 `20 10 * * *`，Description 也已经是每天的措辞。期望值只认此刻从 Devon 真身读回来的字段值，不要复述任何历史文案。
 
 <p><br/></p>
 
