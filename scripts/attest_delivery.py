@@ -21,8 +21,8 @@
 #    读成成功。
 # 4. **轮询，不睡一觉。** 判据是布尔，不是计数。
 # 5. **自证。** 下面那套离线用例每次都先跑：同一个检查器在合成的好样本上必须
-#    0 问题，在八个坏样本上必须各自判红。尺子坏了就 exit 2，而那和「送达失败」
-#    是两件不同的事。
+#    0 问题，在每一个坏样本上必须各自判红（样本数由那张表算，不手写）。
+#    尺子坏了就 exit 2，而那和「送达失败」是两件不同的事。
 #
 # marker 从 manifest.json 读（那是真源，也是这里成为「真取用点」的原因）。
 # 闸门有一条断言把 workflow 里传出去的那个值钉在同一处。
@@ -47,8 +47,31 @@ SELFTEST_CASE_COUNT = 0
 
 
 def hits(comments, marker):
-    """同一个查找器，真货和自证样本都走它。"""
-    return [c for c in comments if marker in (c.get('body') or '')]
+    """同一个查找器，真货和自证样本都走它。
+
+    **认的是第一行，不是子串 —— 这是一次假红换来的。**
+
+    共享回写 workflow 写的是 `body = marker + '\\n' + text`，所以 marker 永远是正文第一行。
+    而闸门报告的逐项 detail 里会印出 marker 原文（第 6 条就是拿两个 marker 做比较的）,
+    于是一条携带报告的评论会**在正文中间**含有 marker，而它并不是一条回写评论。
+
+    子串匹配把那种评论也数进来了。实测（run 32912399074）：回写完全正常、评论确实
+    已更新成本次提交，而 attest 判「带这个标记的评论有 2 条」—— 那是假红，
+    而假红会逼人去改产品迁就尺子。
+
+    两头一起修：composer 那边拆开正文里的 `<!--`（治污染源），这边认第一行（治判据）。
+    只修一头都不够：已经存在的旧评论改不了，而上游以后也可能把别的东西写进正文。
+
+    **耦合参数**：它依赖共享 workflow 把 marker 放在第一行。上游改成放末尾的话，
+    这里会变成「一条都找不到」—— 那是一个响亮的红，不是静默失效，可以接受。
+    """
+    out = []
+    for c in comments:
+        body = c.get('body') or ''
+        first = body.lstrip('\n').split('\n', 1)[0].strip()
+        if first == marker:
+            out.append(c)
+    return out
 
 
 def evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments):
@@ -119,7 +142,16 @@ def selftest():
         ('陈旧评论（没有本次 run id）必须红', ([], [{'body': good_body.replace(run_id, '1')}], None), 1),
         ('降级报告必须红', ([], [{'body': good_body + f'\n{DEGRADED_PHRASE}'}], None), 1),
         ('没有哨兵必须红', ([], [{'body': good_body.replace(COMPOSER_SENTINEL, '')}], None), 1),
-        ('查找器乱匹配必须红', ([], [{'body': good_body + marker + f':attest-selftest-nonexistent:{run_id}'}], None), 1),
+        # 这条要跟着查找语义改：改成认第一行之后，诱饵得把不可能的标记放在第一行。
+        # **正确动作是更新样本，不是删样本** —— 删掉等于把一条承重断言改成装饰。
+        ('查找器乱匹配必须红',
+         ([], [{'body': marker + f':attest-selftest-nonexistent:{run_id}\n' + good_body}], None), 1),
+        # 诱饵：marker 在正文**中间**的评论不算一条回写评论。
+        # 只有这两条能区分「认第一行」和「认子串」—— 后者在 run 32912399074 上假红过。
+        ('真货 + 一条诱饵（marker 在正文中间）必须 0 问题',
+         ([], good + [{'body': '<!-- other-marker -->\n失败项：manifest=' + marker}], None), 0),
+        ('只有诱饵、没有真货必须红',
+         ([], [{'body': '<!-- other-marker -->\n失败项：manifest=' + marker}], None), 1),
     ]
     global SELFTEST_CASE_COUNT
     SELFTEST_CASE_COUNT = len(cases)
