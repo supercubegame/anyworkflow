@@ -52,7 +52,7 @@
     "docs/INCIDENT-LEDGER.md": "43a8f6b796dc8fcfed22e135bf1322b6cce89623",
     "docs/INDEX.md": "e63acd891e21ed1279d5c2697ec7682ec06ab5a8",
     "docs/LIVE-READBACK-LEDGER.md": "94fa1745b112b4c2c56e553ea03194b87a39815e",
-    "docs/MINIMAL-GATE.md": "2c1e2abc6a8c581ad382d81a49071c45bb8f0a46",
+    "docs/MINIMAL-GATE.md": "1cfa33a5dcc50942f39ede05879b025af38ddc77",
     "docs/OBSERVER-PROMPTS.md": "9ef45ac37bac7fdc2a942c7d1a4d3cf6e0d635b6",
     "docs/OBSERVERS.md": "00f94d70c0faf1a303a295cee906c2486d9ffe9d",
     "docs/OFFLINE-BACKUP-FIGURE.md": "df08c0a091ad6a3003b032a090c44f6c1f1a5181",
@@ -69,7 +69,7 @@
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
-    "verify.py": "1a01d1dfecc0aa03c466d62966a16182fe1369c6",
+    "verify.py": "01c0832eabcb296e76da01e6b4b9c14cafa3407a",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "add264c3a7fd0be3a88dd95a11b492d9bfd0feb0",
     "agents/gate-audit-quinn.md": "8e6076a61f5f1e8a3a646121ca28800982bb9ed6",
@@ -124,7 +124,8 @@
     "GitHub 评论的删除 / 编辑不在我的工具里。PR #14 上留着一条带 -x marker 的评论（#5418393988），它的正文中间含着真 marker。改成「认第一行」之后它不再影响判据，所以不需要删 —— 但如果以后真需要删一条评论，那是用户手动动作。",
     "报告里的哈希只印前 12 位。第一次登记 workflow 新哈希时我用那 12 位接上编的后 28 位，当场自查才改成从 API 读全值。教训：截断的标识符只能用来看，不能用来写。",
     "变异体别拷到 /tmp 去跑。verify.py 的 ROOT 是从 __file__ 推的，拷到 /tmp/mut.py 之后它去读 /tmp/manifest.json 然后崩掉 —— **而崩溃不是红**，看起来像变异体活下来了。就地改、跑完再复原。",
-    "**顺序依赖的断言很难自己发现。** 同一次改动里我写了两条读运行时 checks 列表的断言，两条都因为「排在它之后的检查还没 append 进去」而看漏。两条都改成了扫源码。**判据一旦依赖代码顺序，它的覆盖面就不写在任何地方**，而它安静地小于你以为的范围。"
+    "**顺序依赖的断言很难自己发现。** 同一次改动里我写了两条读运行时 checks 列表的断言，两条都因为「排在它之后的检查还没 append 进去」而看漏。两条都改成了扫源码。**判据一旦依赖代码顺序，它的覆盖面就不写在任何地方**，而它安静地小于你以为的范围。",
+    "verify.py、docs/MINIMAL-GATE.md、docs/CHANGELOG-BOOTSTRAP.md 这三份大文件当我整段重写时，存储字节会与本地不同（尺寸都变了）。现在登记的是存储字节：它冻住以后的漂移，而不假装此刻等于本地真源。"
   ],
   "true_copies": {
     "_": "真抄本的四条断言。备份类需求里最值钱的一条是：一份空壳备份和一份完整备份，在文件树上长得一模一样。所以不断言「文件存在」（git 已经证明了，那是空断言）。",
