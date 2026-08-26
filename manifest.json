@@ -77,7 +77,7 @@
     "verify.py": "ad2d3d01c98223c4ee5983b2f9b75a74e86dbfca",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "427e7e7e08c29a6f2c345b5a3078775148bce9fc",
-    "agents/gate-audit-quinn.md": "48b7d84dc256b1f5e8cd6b02bf12e740c134a2bc",
+    "agents/gate-audit-quinn.md": "59a14f884e491ff42cd51f49a20f54cf4d19f4e5",
     "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。**而它守不住一件事**：抄本被掏空而哈希在同一次提交里跟着改了 —— 那一层由 true_copy_size_floor 守。",
@@ -166,7 +166,7 @@
       },
       "agents/gate-audit-quinn.md": {
         "live": "ClickUp Super Agent: 闸门审计 Quinn",
-        "readback_at": "2026-08-26T06:36:00Z",
+        "readback_at": "2026-08-26T10:44:08Z",
         "max_readback_age_days": 3,
         "size_baseline_bytes": 30948,
         "_size_baseline_bytes": "30948 是 2026-08-17 那份存储字节的真实尺寸（已用 blob 哈希核对）。**现在这一条是红的，而它红得对** —— live prompt 已被重写成 6578 字节。修法是把正文恢复到 live 再重导一份，**不是把 baseline 改小** —— 后者是把断言改成装饰。",
