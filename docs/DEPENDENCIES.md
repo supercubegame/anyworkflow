@@ -13,12 +13,32 @@
 - `supercubegame/meetnote`
 - `supercubegame/jumpwow`
 - `supercubegame/image-grabber`
+- `supercubegame/crossyroad`
 - `supercubegame/ci-workflows`
 
 ### 为什么这些是承重依赖
 - `clickup-brain-backup` 是台账与抄本中枢
 - `ci-workflows` 是共享回写的单点
-- 其余几个仓库是 Quinn 每天读回的真实消费者，证明 shared workflow 和观察链条没有只在一个仓库里成立
+- 其余七个仓库里，**至少各有一份 workflow 的 `uses:` 真行在调用共享回写**。它们不是按名字猜的，是逐个读 `.github/workflows/*.yml` 里的真文件读回来的。
+
+### 这一节为什么重写
+原来这张表漏了 `crossyroad`。那不是小疏忽，是同一个形状的第二次：**手写清单永远追不上目录。**
+
+第一次是 `flappycat`：有人拿一条只扫本仓 workflow 的断言，去论证「多消费者分叉不会发生」，而恰好漏掉了一个已经在用 `@main` 的消费者。第二次就是这里：一张写着「哪些是承重仓库」的表，把一个真实消费者漏在外面，而整份备份仓没有任何东西会红。
+
+**正确修法不是“记得以后别漏”。** 这页现在直接把当次读回到的真值写出来：
+
+- `clickup-brain-backup`: `split-apply.yml`、`split-dry-run.yml`、`verify.yml`
+- `TodoX`: `verify.yml`、`release.yml`、`screenshots.yml`、`mirror.yml`
+- `flappycat`: `verify.yml`
+- `meetnote`: `verify.yml`
+- `jumpwow`: `verify.yml`
+- `image-grabber`: `verify.yml`
+- `crossyroad`: `verify.yml`
+
+一共 **15** 份 workflow 文件，分布在 **7** 个消费者仓库里。这个数字是这次读回来数的，不是拍脑袋写的。
+
+**但这页仍然不是机器派生的。** 它现在只是从“手写记忆”提升到了“带一次真读回的手写台账”。下次如果这些仓里又长出新的 workflow，这页**仍然会过期而全绿**。所以这张表最好的下一步不是继续补字，是把「消费者集合」本身变成一条断言或一份生成物。
 
 ## 二、共享 workflow 依赖
 
@@ -34,6 +54,15 @@
 - 这份 repo 里已归档一份当前抄本：`vendor/ci-workflows/report.yml`
 - 但归档拷贝只证明“上次读回时它长这样”，证明不了远端主干此刻还是这样
 - 所以需要外部观察者和带期限的读回时间戳
+
+### 当下读回到的真实消费者分布
+按这次逐仓读回 `.github/workflows/*.yml` 的真实 `uses:` 行：
+
+- **跟随 `@main`**：`clickup-brain-backup`（3 份）、`flappycat`（1 份）、`jumpwow`（1 份）、`image-grabber`（1 份）、`crossyroad`（1 份）
+- **仍然钉在 `f0fccd3f`**：`TodoX` 的 `verify.yml`、`release.yml`、`screenshots.yml`、`mirror.yml`
+- **不走共享 reusable workflow，而是自己写回**：`meetnote` 的 `verify.yml`
+
+也就是说，这页现在能诚实地说：**版本策略真的还在分叉，而分叉目前集中在 TodoX。** 这不是从别的台账抄来的，是从那些仓自己的 workflow 真文件读回来的。
 
 ## 三、ClickUp 真身依赖
 
