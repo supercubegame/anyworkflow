@@ -72,7 +72,6 @@
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
     "verify.py": "2d2cfa2d12f6658c5ce95dd9095b6695717625af",
-    "manifest.json": "5e50ea55d252a8b2b69252497928d42a71dc479b",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "add264c3a7fd0be3a88dd95a11b492d9bfd0feb0",
     "agents/gate-audit-quinn.md": "8e6076a61f5f1e8a3a646121ca28800982bb9ed6",
@@ -116,13 +115,12 @@
       "docs/SUMMARY-TRIGGER-EVIDENCE-0001.md",
       "docs/VERIFY-EVIDENCE-0001.md",
       "docs/VERIFY-EVIDENCE-0002.md",
-      "manifest.json",
       "scripts/attest_delivery.py",
       "vendor/ci-workflows/report.yml",
       "verify.py"
     ]
   },
-  "_docs_integrity_manifest_note": "manifest.json 自己不在 docs_integrity 里 —— 登记自己的哈希是个无限递归。这就是链条最后一环：**登记表本身没人守**。写下来，别假装它闭合了。docs_integrity 守别的文件；manifest 自己靠顶层键、invariants、checks、以及外部读回来守。",
+  "_docs_integrity_manifest_note": "manifest.json 不在 docs_integrity 里 —— 登记自己的哈希是个无限递归。这就是链条最后一环：**登记表本身没人守**。写下来，别假装它闭合了。docs_integrity 守别的文件；manifest 自己靠顶层键、invariants、checks、以及外部读回来守。",
   "_tested_limits": [
     "逐字节重现一份长中文文档：做不到，而**根因已定位**：不是存储通道，是我往文件里写中文时会敲成形近字，手写 Unicode 转义时同样会敲错码位，而两种都**字节长度不变** —— 所以体积与关键字类检查全部看不见。已踩九次（最后几次就在写这条断言本身的注释与文档里）。现在有一条黑名单断言在守，而它上线后的每一轮都在干活。**黑名单对新错字默认泄漏**：实测两个漏网的例子（一个简繁形近、一个敌意无关的同音字）它都没抓到。方向对，覆盖面不完整。",
     "我读评论的通道会吞掉 HTML 注释，所以 marker 与 composer 哨兵在我眼里都是空的。能证明它们真在正文里的只有 attest。这正好是该有的分工，但也意味着我没法用肉眼替它做这件事。",
