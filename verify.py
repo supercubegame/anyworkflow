@@ -207,13 +207,31 @@ detail = (f'{len(copies)} 份抄本共 {section_total} 个必需小节全部非�
           else ('; '.join(bad) if bad else 'copies 为空'))
 check('true_copy_restore_sufficiency', '真抄本恢复充分性（必需小节非空）', ok, detail)
 
+# 期限现在**可以按抄本收紧，但不许放宽**。理由是一次真事故（见 _tested_limits）：
+# 一个能编辑自己的 agent 在 9 天里把自己的 prompt 重写掉了七成八，而全局 30 天
+# 的期限意味着它有整整一个月可以隐形地改自己。**收紧一条上限是修复，放宽一条
+# 上限是把断言改成装饰**,所以覆盖值比全局更松时这条直接判红。
 max_age = true_copies.get('max_readback_age_days')
 valid_max_age = isinstance(max_age, int) and not isinstance(max_age, bool) and max_age > 0
 now = datetime.now(timezone.utc)
 bad = []
 ages = []
+limits = {}
 for rel in sorted(copies):
-    raw = (copies[rel] or {}).get('readback_at')
+    spec = copies[rel] or {}
+    limit = max_age
+    override = spec.get('max_readback_age_days')
+    if override is not None:
+        if not (isinstance(override, int) and not isinstance(override, bool) and override > 0):
+            bad.append(f'{rel}：读回期限覆盖值不是正整数：{override!r}')
+            continue
+        if valid_max_age and override > max_age:
+            bad.append(f'{rel}：覆盖值 {override} 天比全局上限 {max_age} 天更松 ——'
+                       f' **覆盖只许更严**，放宽一条上限等于亲手把断言改成装饰')
+            continue
+        limit = override
+    limits[rel] = limit
+    raw = spec.get('readback_at')
     if not raw:
         bad.append(f'{rel}：没有 readback_at —— 一份没有读回时间的抄本等于一张旧纸')
         continue
@@ -223,21 +241,74 @@ for rel in sorted(copies):
         bad.append(f'{rel}：readback_at 解析不了：{raw!r}')
         continue
     age = (now - when).total_seconds() / 86400.0
-    ages.append((rel, age))
+    ages.append((rel, age, limit))
     if age < -(10 / 1440.0):
         bad.append(f'{rel}：readback_at 落在未来（{-age:.2f} 天后）：{raw}')
-    elif valid_max_age and age > max_age:
-        bad.append(f'{rel}：读回已 {age:.1f} 天，超过上限 {max_age} 天：{raw}')
+    elif isinstance(limit, int) and age > limit:
+        bad.append(f'{rel}：读回已 {age:.1f} 天，超过上限 {limit} 天：{raw}')
 if not valid_max_age:
     ok, detail = False, f'max_readback_age_days 不是正整数：{max_age!r} —— 没有期限的新鲜度断言是空的'
 elif not copies:
     ok, detail = False, 'copies 为空'
 else:
     ok = not bad
-    oldest = max(ages, key=lambda x: x[1]) if ages else None
-    detail = ((f'最旧那份 {oldest[0]} 已 {oldest[1]:.1f} 天，还剩 {max_age - oldest[1]:.1f} 天'
-               f'（上限 {max_age}）') if ok else '; '.join(bad))
-check('true_copy_readback_freshness', '真抄本读回新鲜度（带期限）', ok, detail)
+    tightest = min((a for a in ages), key=lambda x: x[2] - x[1]) if ages else None
+    detail = ((f'最吃紧那份 {tightest[0]} 已 {tightest[1]:.1f} 天，还剩'
+               f' {tightest[2] - tightest[1]:.1f} 天（它的上限 {tightest[2]}，全局 {max_age}）') if ok
+              else '; '.join(bad))
+check('true_copy_readback_freshness', '真抄本读回新鲜度（按抄本可收紧的期限）', ok, detail)
+
+# --------------------------------------------------------------------------
+# 真抄本体积下限：**抄本不许悄悄缩水**。
+#
+# 这一条是被一次真事故逼出来的，而它暴露的洞是前面那几条合起来也看不见的：
+# 一份被抽空七成八的抄本，如果登记的哈希在同一次提交里跟着改了，
+# **逐字节身份那条会全绿** —— 它守的是「有没有人偷偷改过存储字节」，
+# 不是「这份抄本还是不是原来那份东西」。锚点那条能抓到一部分（删掉整节会失配），
+# 但锚点只覆盖被登记的那几句，一次「保留骨架、掏空细节」的重写完全躲得过。
+#
+# 所以这里给每份抄本登记一个**高水位**，并且两侧都能红：
+#   - 掉到高水位的 (1 - max_shrink_ratio) 以下 -> 红。想接受这次缩水，
+#     只能显式把 baseline 改下去 —— 那是一次写在 diff 里、看得见的动作。
+#   - 长到高水位之上 -> 也红，要求把水位抬上来。**不抬的话这个水位会慢慢
+#     变得抓不住任何东西**，那正是「下限型的计数会自己漂」那条病。
+#   - 容差本身有上下界：写成 0.9 会放走掉九成的抄本，写成 0 则是一台假红工厂。
+# --------------------------------------------------------------------------
+shrink_ratio = true_copies.get('max_shrink_ratio')
+bad = []
+notes_sz = []
+if not isinstance(shrink_ratio, float) or not (0.0 < shrink_ratio <= 0.5):
+    ok, detail = False, (f'max_shrink_ratio 必须是 (0, 0.5] 区间的浮点数：{shrink_ratio!r} ——'
+                         f' 太大会放走被抽空的抄本，太小则是一台假红工厂')
+elif not copies:
+    ok, detail = False, 'copies 为空 —— 空登记表让这条断言当场变空'
+else:
+    for rel in sorted(copies):
+        spec = copies[rel] or {}
+        base = spec.get('size_baseline_bytes')
+        target = ROOT / rel
+        if not (isinstance(base, int) and not isinstance(base, bool) and base > 0):
+            bad.append(f'{rel}：没登记 size_baseline_bytes 或不是正整数：{base!r} ——'
+                       f' 缺了它这条断言对这一份就是空的')
+            continue
+        if not target.exists():
+            bad.append(f'{rel}：登记了但文件不在')
+            continue
+        cur = len(target.read_bytes())
+        floor = int(base * (1.0 - shrink_ratio))
+        if cur < floor:
+            bad.append(f'{rel}：现在 {cur} 字节，低于下限 {floor}（高水位 {base}，'
+                       f'容差 {int(shrink_ratio * 100)}%），缩水 {100 - cur * 100 // base}%。'
+                       f'**一份被抽空的抄本和一次正当精简长得一样**，所以改 baseline 必须是显式动作')
+        elif cur > base:
+            bad.append(f'{rel}：现在 {cur} 字节，高于高水位 {base} —— 把 baseline 抬到 {cur}，'
+                       f'否则这个水位会慢慢变得抓不住任何东西')
+        else:
+            notes_sz.append(f'{rel}：{cur}/{base}（下限 {floor}）')
+    ok = not bad
+    detail = (f'{len(copies)} 份抄本体积都在高水位与下限之间（容差 {int(shrink_ratio * 100)}%）：'
+              + ' · '.join(notes_sz)) if ok else '; '.join(bad)
+check('true_copy_size_floor', '真抄本体积下限（高水位 + 缩水容差，两侧都红）', ok, detail)
 
 # --------------------------------------------------------------------------
 # 形近错字黑名单。
@@ -472,7 +543,10 @@ report = {
         'anchorTotal': anchor_total,
         'requiredSectionTotal': section_total,
         'maxReadbackAgeDays': max_age,
-        'oldestReadbackAgeDays': (round(max(a for _, a in ages), 2) if ages else None),
+        'perCopyReadbackLimits': {k: limits[k] for k in sorted(limits)},
+        'oldestReadbackAgeDays': (round(max(a for _, a, _l in ages), 2) if ages else None),
+        'maxShrinkRatio': shrink_ratio,
+        'copySizeBaselines': {k: (copies[k] or {}).get('size_baseline_bytes') for k in sorted(copies)},
         'confusablesScanned': len(scanned),
         'confusablesBlacklist': len(CONFUSABLES),
         'crossCopyPairs': len(pairs),
