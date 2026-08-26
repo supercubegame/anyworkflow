@@ -168,8 +168,8 @@
         "live": "ClickUp Super Agent: 闸门审计 Quinn",
         "readback_at": "2026-08-26T10:44:08Z",
         "max_readback_age_days": 3,
-        "size_baseline_bytes": 30948,
-        "_size_baseline_bytes": "30948 是 2026-08-17 那份存储字节的真实尺寸（已用 blob 哈希核对）。**现在这一条是红的，而它红得对** —— live prompt 已被重写成 6578 字节。修法是把正文恢复到 live 再重导一份，**不是把 baseline 改小** —— 后者是把断言改成装饰。",
+        "size_baseline_bytes": 8628,
+        "_size_baseline_bytes": "8628 是 2026-08-26 重构后的存储字节真实尺寸。旧值 30948 描述的是重构前那份 30KB 正文，而 prompt 已按「指令 / 档案」拆开：案例史搬进 docs/QUINN-FIELD-NOTES.md，prompt 只留铁律与判据。**这次下调是显式动作，理由写在这里** —— 高水位描述的对象变了，不是为了让断言变绿。",
         "kind": "full-prompt",
         "required_sections": [
           "### Name",
@@ -180,11 +180,11 @@
         ],
         "anchors": [
           "20 9 * * *",
-          "_tested_limits",
-          "pending_ref_migration",
-          "upstream_read_at",
-          ".github/live-heartbeat.json",
-          "scripts/lib/split-guard.mjs"
+          "docs/QUINN-FIELD-NOTES.md",
+          "Edit self",
+          "add_agent_schedule",
+          "20 10 * * *",
+          "last_scheduled_run"
         ]
       },
       "vendor/ci-workflows/report.yml": {
@@ -228,6 +228,16 @@
       "## 备份仓与 TodoX 特别看什么",
       "## 测不出来的：这份清单唯一的常规外部审计",
       "## 已知的通道限制"
+    ],
+    "archive_anchors": [
+      "_tested_limits",
+      "pending_ref_migration",
+      "upstream_read_at",
+      ".github/live-heartbeat.json",
+      "scripts/lib/split-guard.mjs",
+      "17 3 * * *",
+      "docs/OBLIGATIONS.json",
+      "checks_passed"
     ]
   },
   "obligations": [],
