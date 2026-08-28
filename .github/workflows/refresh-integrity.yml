@@ -1,0 +1,85 @@
+name: refresh-integrity
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: 'registered path whose blob should be refreshed'
+        required: true
+        default: .github/workflows/verify.yml
+
+permissions: {}
+
+jobs:
+  refresh:
+    name: refresh one docs_integrity blob
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: recompute one blob from disk
+        shell: bash
+        env:
+          TARGET: ${{ inputs.path }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          def blob(raw):
+              return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
+          target = os.environ['TARGET']
+          raw = open('manifest.json', encoding='utf-8').read()
+          before = raw.encode()
+          print('manifest bytes', len(before))
+          print('manifest blob ', blob(before))
+          obj = json.loads(raw)
+          reg = obj['docs_integrity']
+          assert target in reg, 'not a registered path: %s' % target
+          stale = []
+          for rel in sorted(reg):
+              got = blob(open(rel, 'rb').read())
+              if got != reg[rel]:
+                  stale.append((rel, reg[rel], got))
+          for rel, want, got in stale:
+              print('stale', rel, want[:12], '->', got[:12])
+          assert len(stale) == 1, 'expected exactly 1 stale entry, got %d' % len(stale)
+          rel, want, got = stale[0]
+          assert rel == target, 'the stale entry is %s, not the requested %s' % (rel, target)
+          reg[rel] = got
+          out = json.dumps(obj, ensure_ascii=False, indent=2) + '\n'
+          after = out.encode()
+          a, b = json.loads(raw), json.loads(out)
+          diffs = []
+          def walk(x, y, p=''):
+              if isinstance(x, dict):
+                  assert x.keys() == y.keys(), p
+                  for k in x: walk(x[k], y[k], p + '/' + k)
+              elif isinstance(x, list):
+                  assert len(x) == len(y), p
+                  for i, (m, n) in enumerate(zip(x, y)): walk(m, n, p + '[%d]' % i)
+              elif x != y:
+                  diffs.append((p, x, y))
+          walk(a, b)
+          for p, x, y in diffs:
+              print('changed', p, x, '->', y)
+          assert len(diffs) == 1, 'expected exactly 1 changed leaf, got %d' % len(diffs)
+          assert len(after) == len(before), 'byte length must not change'
+          open('manifest.json', 'w', encoding='utf-8').write(out)
+          print('new bytes', len(after))
+          print('new blob ', blob(after))
+          PY
+      - name: commit and push branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="sync/refresh-integrity-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git add manifest.json
+          git commit -m "sync: refresh one docs_integrity blob (computed in CI from disk)"
+          git push origin "$branch"
+          echo "branch pushed: $branch"
+          echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
