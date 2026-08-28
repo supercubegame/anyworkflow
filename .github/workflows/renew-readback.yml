@@ -89,11 +89,17 @@ jobs:
           git add manifest.json
           git commit -m "sync: renew agent copy readback_at (CI-side patch, no hand-copied bytes)"
           git push origin "$branch"
+          {
+            echo 'Patched in CI against the checkout, so the manifest never passes through a hand-retyped copy.'
+            echo ''
+            echo "- Quinn readback_at -> ${QUINN_AT}"
+            echo "- Devon readback_at -> ${DEVON_AT}"
+            echo ''
+            echo 'The patch script asserts exactly two changed fields, identical key sets, and unchanged byte length.'
+            echo 'It prints the base blob and the new blob, so the run log is self-proving.'
+            echo ''
+            echo "run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          } > /tmp/pr.md
           gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
             --title 'sync: renew agent copy readback_at' \
-            --body "Patched in CI against the repo's own checkout, so the 29KB manifest never passes through a hand-retyped copy.
-
-- Quinn readback_at -> ${QUINN_AT}
-- Devon readback_at -> ${DEVON_AT}
-
-The patch script asserts exactly two changed fields, identical key sets, and unchanged byte length. It prints the base blob and the new blob so the write is self-proving from the run log."
+            --body-file /tmp/pr.md
