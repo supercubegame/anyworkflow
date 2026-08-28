@@ -1,0 +1,83 @@
+name: append-tested-limit
+
+on:
+  workflow_dispatch:
+    inputs:
+      payload:
+        description: 'path to the ascii-escaped entry file'
+        required: true
+        default: .github/payloads/limit-20260828.txt
+
+permissions: {}
+
+jobs:
+  append:
+    name: append one tested limit and open branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: decode payload and append
+        shell: bash
+        env:
+          PAYLOAD: ${{ inputs.payload }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          def blob(raw):
+              return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
+          p = os.environ['PAYLOAD']
+          escaped = open(p, encoding='ascii').read().strip()
+          entry = json.loads('"' + escaped + '"')
+          print('payload file', p)
+          print('escaped chars', len(escaped))
+          print('decoded chars', len(entry))
+          print('decoded utf8 bytes', len(entry.encode()))
+          assert len(entry) > 500, 'decoded entry suspiciously short'
+          assert entry.startswith('**2026-08-28'), 'decoded entry does not start as expected'
+          raw = open('manifest.json', encoding='utf-8').read()
+          before = raw.encode()
+          print('manifest bytes', len(before))
+          print('manifest blob ', blob(before))
+          obj = json.loads(raw)
+          limits = obj['_tested_limits']
+          n_before = len(limits)
+          assert entry not in limits, 'this exact entry is already recorded'
+          limits.append(entry)
+          out = json.dumps(obj, ensure_ascii=False, indent=2) + '\n'
+          after = out.encode()
+          a, b = json.loads(raw), json.loads(out)
+          assert a.keys() == b.keys(), 'top-level keys changed'
+          assert len(b['_tested_limits']) == n_before + 1, 'list did not grow by exactly 1'
+          assert b['_tested_limits'][:n_before] == a['_tested_limits'], 'existing entries were altered'
+          for k in a:
+              if k != '_tested_limits':
+                  assert a[k] == b[k], 'unrelated key changed: %s' % k
+          assert len(after) > len(before), 'file must grow'
+          open('manifest.json', 'w', encoding='utf-8').write(out)
+          print('entries', n_before, '->', len(b['_tested_limits']))
+          print('new bytes', len(after), 'delta +%d' % (len(after) - len(before)))
+          print('new blob ', blob(after))
+          PY
+      - name: run the gate before pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python3 verify.py
+      - name: commit and push branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="docs/append-limit-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git add manifest.json
+          git commit -m "docs: append one tested limit (decoded in CI from an ascii payload)"
+          git push origin "$branch"
+          echo "branch pushed: $branch"
+          echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
