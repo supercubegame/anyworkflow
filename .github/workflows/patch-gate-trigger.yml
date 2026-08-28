@@ -1,0 +1,60 @@
+name: patch-gate-trigger
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  patch:
+    name: add pull_request trigger and open branch
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: patch verify.yml trigger only
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib
+          p = '.github/workflows/verify.yml'
+          raw = open(p, encoding='utf-8').read()
+          before = raw.encode()
+          print('base bytes', len(before))
+          print('base blob ', hashlib.sha1(b'blob %d\x00' % len(before) + before).hexdigest())
+          old = "on:\n  push:\n    branches: ['**']\n  workflow_dispatch:\n"
+          new = "on:\n  push:\n    branches: ['**']\n  pull_request:\n    branches: ['**']\n  workflow_dispatch:\n"
+          assert raw.count(old) == 1, 'anchor not unique: %d' % raw.count(old)
+          assert raw.count('pull_request:') == 0, 'already patched'
+          out = raw.replace(old, new)
+          after = out.encode()
+          assert len(after) - len(before) == 37, 'unexpected delta %d' % (len(after) - len(before))
+          a = raw.split('\n')
+          b = out.split('\n')
+          assert len(b) - len(a) == 2, 'expected exactly 2 new lines'
+          import difflib
+          changed = [l for l in difflib.unified_diff(a, b, n=0, lineterm='') if l[:1] in '+-' and l[:3] not in ('+++', '---')]
+          for l in changed:
+              print('diff', l)
+          assert all(l.startswith('+') for l in changed), 'nothing may be removed or altered'
+          assert len(changed) == 2, 'expected 2 diff lines, got %d' % len(changed)
+          open(p, 'w', encoding='utf-8').write(out)
+          print('new bytes', len(after))
+          print('new blob ', hashlib.sha1(b'blob %d\x00' % len(after) + after).hexdigest())
+          PY
+      - name: commit and push branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="ci/gate-pr-trigger-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git add .github/workflows/verify.yml
+          git commit -m "ci: make the gate listen on pull_request too"
+          git push origin "$branch"
+          echo "branch pushed: $branch"
+          echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
