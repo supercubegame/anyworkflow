@@ -74,11 +74,15 @@
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
-    "verify.py": "ed16f6ed2532ac4032b0497e618ca815a98504d2",
+    "verify.py": "170a2ad9a48cbc49f24b47ce06db6ab91d1a18c4",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "f2bee345da06bbfb0f5a007ddfdb0961fd44cbe5",
     "agents/gate-audit-quinn.md": "a6cbf6778256b1ba0e6a0a416153df11c690b636",
-    "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581"
+    "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581",
+    ".github/workflows/append-tested-limit.yml": "7ca334d96ec98bc804fb1eacd3cdc18959d99b72",
+    ".github/workflows/refresh-integrity.yml": "5a5dfd7826929fba8b7c936c9b1019ccaadf38b6",
+    ".github/workflows/register-workflow-dir.yml": "0912039055a17e7068b196ce765532e9d5bbac28",
+    ".github/workflows/renew-readback.yml": "364f06925d2e7a3636bb8f4020fbde78858cdeec"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。**而它守不住一件事**：抄本被掏空而哈希在同一次提交里跟着改了 —— 那一层由 true_copy_size_floor 守。",
   "docs_integrity_provenance": {

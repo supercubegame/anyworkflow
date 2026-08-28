@@ -78,7 +78,7 @@ else:
 check('composer_sentinel_pinned', 'composer 哨兵：写入方与核对方逐字相同', ok, detail)
 
 EMPTY_BLOB = 'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391'
-REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows')
+REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows', '.github/workflows')
 
 def git_blob(raw):
     return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
