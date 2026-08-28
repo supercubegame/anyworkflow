@@ -1,0 +1,123 @@
+name: register-workflow-dir
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  register:
+    name: add workflows dir to the registry and register its files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: patch verify.py and manifest.json together
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, json, os
+          def blob(raw):
+              return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
+
+          WFDIR = '.github/workflows'
+          OLD = "REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows')"
+          NEW = "REGISTERED_DIRS = ('docs', 'scripts', 'agents', 'vendor/ci-workflows', '.github/workflows')"
+
+          vp = 'verify.py'
+          vsrc = open(vp, encoding='utf-8').read()
+          print('verify.py bytes', len(vsrc.encode()))
+          print('verify.py blob ', blob(vsrc.encode()))
+          assert vsrc.count(OLD) == 1, 'anchor count %d' % vsrc.count(OLD)
+          assert WFDIR not in vsrc.split('REGISTERED_DIRS')[1].split(')')[0], 'already registered'
+          vout = vsrc.replace(OLD, NEW)
+          va, vb = vsrc.split('\n'), vout.split('\n')
+          assert len(va) == len(vb), 'line count must not change'
+          vchanged = [i for i, (x, y) in enumerate(zip(va, vb)) if x != y]
+          assert len(vchanged) == 1, 'expected 1 changed line, got %d' % len(vchanged)
+          print('verify.py line', vchanged[0] + 1, 'changed')
+
+          mp = 'manifest.json'
+          msrc = open(mp, encoding='utf-8').read()
+          print('manifest bytes', len(msrc.encode()))
+          print('manifest blob ', blob(msrc.encode()))
+          obj = json.loads(msrc)
+          reg = obj['docs_integrity']
+
+          on_disk = sorted(f for f in os.listdir(WFDIR) if os.path.isfile(os.path.join(WFDIR, f)))
+          print('workflow files on disk:', on_disk)
+          added = []
+          for name in on_disk:
+              rel = WFDIR + '/' + name
+              h = blob(open(rel, 'rb').read())
+              if rel in reg:
+                  assert reg[rel] == h, '%s already registered with a stale hash' % rel
+                  print('already registered', rel, h[:12])
+              else:
+                  reg[rel] = h
+                  added.append((rel, h))
+                  print('registering', rel, h[:12])
+          assert added, 'nothing to add - already done'
+
+          # verify.py itself is registered, so its hash must be refreshed in the same push
+          old_vhash = reg[vp]
+          new_vhash = blob(vout.encode())
+          assert old_vhash != new_vhash, 'verify.py hash did not change'
+          reg[vp] = new_vhash
+          print('refreshing', vp, old_vhash[:12], '->', new_vhash[:12])
+
+          # every other registered file must already be clean
+          stale = []
+          for rel in sorted(reg):
+              if rel == vp or rel in [a for a, _h in added]:
+                  continue
+              stale.append(rel) if blob(open(rel, 'rb').read()) != reg[rel] else None
+          assert not stale, 'unrelated stale entries: %s' % stale
+
+          mout = json.dumps(obj, ensure_ascii=False, indent=2) + '\n'
+          a, b = json.loads(msrc), json.loads(mout)
+          diffs = []
+          def walk(x, y, p=''):
+              if isinstance(x, dict):
+                  for k in sorted(set(x) | set(y)):
+                      if k not in x:
+                          diffs.append((p + '/' + k, None, y[k])); continue
+                      assert k in y, 'key removed: %s' % (p + '/' + k)
+                      walk(x[k], y[k], p + '/' + k)
+              elif isinstance(x, list):
+                  assert len(x) == len(y), p
+                  for i, (m, n) in enumerate(zip(x, y)): walk(m, n, p + '[%d]' % i)
+              elif x != y:
+                  diffs.append((p, x, y))
+          walk(a, b)
+          for p, x, y in diffs:
+              print('changed', p, x, '->', y)
+          assert len(diffs) == len(added) + 1, 'expected %d changes, got %d' % (len(added) + 1, len(diffs))
+
+          open(vp, 'w', encoding='utf-8').write(vout)
+          open(mp, 'w', encoding='utf-8').write(mout)
+          print('new verify.py blob', blob(vout.encode()), len(vout.encode()))
+          print('new manifest blob ', blob(mout.encode()), len(mout.encode()))
+          PY
+      - name: run the gate before pushing
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts
+          python3 verify.py
+      - name: commit and push branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="sync/register-workflow-dir-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git add verify.py manifest.json
+          git commit -m "ci: register the workflows dir and its files (computed in CI)"
+          git push origin "$branch"
+          echo "branch pushed: $branch"
+          echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
