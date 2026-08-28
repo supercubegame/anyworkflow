@@ -62,12 +62,14 @@ jobs:
                   print('registering', rel, h[:12])
           assert added, 'nothing to add - already done'
 
+          # verify.py itself is registered, so its hash must be refreshed in the same push
           old_vhash = reg[vp]
           new_vhash = blob(vout.encode())
           assert old_vhash != new_vhash, 'verify.py hash did not change'
           reg[vp] = new_vhash
           print('refreshing', vp, old_vhash[:12], '->', new_vhash[:12])
 
+          # every other registered file must already be clean
           stale = []
           for rel in sorted(reg):
               if rel == vp or rel in [a for a, _h in added]:
