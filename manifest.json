@@ -42,7 +42,7 @@
   },
   "_invariants": "键是每条检查的稳定 id，**与 verify.py 里实际的 check() 取用点集合相等**。在那之前这几个键从来没被读过 —— 它们看起来像一份声明，而实际上写什么都行。两侧都红：新加检查忘了登记红，删了检查而键还挂着也红。**用 id 而不用标题**：拿可读名字当键会让重命名变成承重操作。checks.verify 只数个数，看不见“是哪几条”；这一条比集合。",
   "docs_integrity": {
-    ".github/workflows/verify.yml": "e4b45acf2050670c3e8241aa48bf8978b240360e",
+    ".github/workflows/verify.yml": "56bc31c8a7f9e0f3024cb9d20ff98cfee2a0e538",
     "AGENTS.md": "e16e3cafa8d916273b7b84b3b960b3d19cec93cc",
     "CLAUDE.md": "e16e3cafa8d916273b7b84b3b960b3d19cec93cc",
     "docs/BLIND-SPOTS.md": "ec171da31854cfe38e4711398888265574436e5b",
