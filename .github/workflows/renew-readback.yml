@@ -1,0 +1,99 @@
+name: renew-readback
+
+on:
+  workflow_dispatch:
+    inputs:
+      quinn_at:
+        description: 'Quinn readback_at (ISO Z)'
+        required: true
+      devon_at:
+        description: 'Devon readback_at (ISO Z)'
+        required: true
+
+permissions: {}
+
+jobs:
+  renew:
+    name: patch readback_at and open PR
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: patch two fields only
+        shell: bash
+        env:
+          QUINN_AT: ${{ inputs.quinn_at }}
+          DEVON_AT: ${{ inputs.devon_at }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, hashlib, re
+          ISO = re.compile(r'^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$')
+          q, d = os.environ['QUINN_AT'], os.environ['DEVON_AT']
+          for v in (q, d):
+              assert ISO.match(v), f'bad timestamp: {v}'
+          raw = open('manifest.json', encoding='utf-8').read()
+          before = raw.encode()
+          print('base bytes', len(before))
+          print('base blob ', hashlib.sha1(b'blob %d\x00' % len(before) + before).hexdigest())
+          obj = json.loads(raw)
+          copies = obj['true_copies']['copies']
+          qk, dk = 'agents/gate-audit-quinn.md', 'agents/drift-devon.md'
+          old_q = copies[qk]['readback_at']
+          old_d = copies[dk]['readback_at']
+          copies[qk]['readback_at'] = q
+          copies[dk]['readback_at'] = d
+          out = json.dumps(obj, ensure_ascii=False, indent=2) + '\n'
+          after = out.encode()
+          a, b = json.loads(raw), json.loads(out)
+          diffs = []
+          def walk(x, y, p=''):
+              if isinstance(x, dict):
+                  assert x.keys() == y.keys(), p
+                  for k in x: walk(x[k], y[k], p + '/' + k)
+              elif isinstance(x, list):
+                  assert len(x) == len(y), p
+                  for i, (m, n) in enumerate(zip(x, y)): walk(m, n, p + f'[{i}]')
+              elif x != y:
+                  diffs.append((p, x, y))
+          walk(a, b)
+          for p, x, y in diffs:
+              print('changed', p, x, '->', y)
+          assert len(diffs) == 2, f'expected exactly 2 changes, got {len(diffs)}'
+          assert len(after) == len(before), 'byte length must not change'
+          open('manifest.json', 'w', encoding='utf-8').write(out)
+          print('new bytes', len(after))
+          print('new blob ', hashlib.sha1(b'blob %d\x00' % len(after) + after).hexdigest())
+          print('quinn', old_q, '->', q)
+          print('devon', old_d, '->', d)
+          PY
+      - name: commit and open PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QUINN_AT: ${{ inputs.quinn_at }}
+          DEVON_AT: ${{ inputs.devon_at }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="sync/renew-readback-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          if git diff --quiet -- manifest.json; then
+            echo 'nothing changed - already at these timestamps'
+            exit 0
+          fi
+          git add manifest.json
+          git commit -m "sync: renew agent copy readback_at (CI-side patch, no hand-copied bytes)"
+          git push origin "$branch"
+          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
+            --title 'sync: renew agent copy readback_at' \
+            --body "Patched in CI against the repo's own checkout, so the 29KB manifest never passes through a hand-retyped copy.
+
+- Quinn readback_at -> ${QUINN_AT}
+- Devon readback_at -> ${DEVON_AT}
+
+The patch script asserts exactly two changed fields, identical key sets, and unchanged byte length. It prints the base blob and the new blob so the write is self-proving from the run log."
