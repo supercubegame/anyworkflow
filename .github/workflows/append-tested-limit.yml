@@ -26,7 +26,7 @@ jobs:
         run: |
           set -euo pipefail
           python3 - <<'PY'
-          import hashlib, json, os
+          import hashlib, json, os, re
           def blob(raw):
               return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
           p = os.environ['PAYLOAD']
@@ -37,7 +37,9 @@ jobs:
           print('decoded chars', len(entry))
           print('decoded utf8 bytes', len(entry.encode()))
           assert len(entry) > 500, 'decoded entry suspiciously short'
-          assert entry.startswith('**2026-08-28'), 'decoded entry does not start as expected'
+          # Shape, not identity. The previous version hardcoded a single date and so
+          # accepted only the payload it shipped with, which refused the second one.
+          assert re.match(r'^\*\*\d{4}-\d\d-\d\d', entry), 'decoded entry must start with a bold ISO date'
           raw = open('manifest.json', encoding='utf-8').read()
           before = raw.encode()
           print('manifest bytes', len(before))
