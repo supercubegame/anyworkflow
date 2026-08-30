@@ -1,10 +1,11 @@
 # Shared Writeback Consumers
 
-This file is generated from the backup repo's current workspace knowledge of repos that call `supercubegame/ci-workflows/.github/workflows/report.yml`.
+This file is rendered from the CONSUMER_FILES dict in verify.py -- repos that call `supercubegame/ci-workflows/.github/workflows/report.yml`.
+**It is not derived from those repos.** The gate compares this file against that dict, so both sides are one witness counted twice: a wrong dict renders a matching wrong file and the check stays green. That happened -- meetnote sat in the dict for weeks while its verify.yml wrote back on its own. A real derivation needs a cross-repo token, which this offline gate does not have.
 It exists because a hand-maintained prose list already missed real consumers twice, and the first version of this generated list missed one again.
 
-- Repositories: **7**
-- Workflow files: **12**
+- Repositories: **6**
+- Workflow files: **11**
 
 ## TodoX
 - `.github/workflows/verify.yml`
@@ -27,7 +28,4 @@ It exists because a hand-maintained prose list already missed real consumers twi
 - `.github/workflows/verify.yml`
 
 ## jumpwow
-- `.github/workflows/verify.yml`
-
-## meetnote
 - `.github/workflows/verify.yml`
