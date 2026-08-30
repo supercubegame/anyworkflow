@@ -1,0 +1,182 @@
+name: fix-consumer-set
+
+on:
+  workflow_dispatch:
+    inputs:
+      path:
+        description: 'file holding CONSUMER_FILES'
+        required: true
+        default: verify.py
+
+permissions: {}
+
+jobs:
+  patch:
+    name: drop a repo that is not a consumer, and stop calling the artifact generated
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: patch the dict, re-render the doc, refresh both hashes
+        id: patch
+        continue-on-error: true
+        shell: bash
+        env:
+          TARGET: ${{ inputs.path }}
+        run: |
+          set -o pipefail
+          mkdir -p artifacts
+          python3 - 2>&1 <<'PYEOF' | tee artifacts/fix-consumer-set.log
+          import hashlib, json, os, re, sys
+
+          def blob(raw):
+              return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
+
+          TARGET = os.environ.get('TARGET', 'verify.py')
+          DOC = 'docs/SHARED-WRITEBACK-CONSUMERS.md'
+          MANIFEST = 'manifest.json'
+
+          # meetnote is not a consumer. Read 2026-08-30 from its real verify.yml: it writes back
+          # itself with actions/github-script@v7 and contains no `uses:` of the shared workflow at
+          # all. The hand-written ledger in docs/DEPENDENCIES.md says so correctly; this dict says
+          # otherwise, and the dict is what the "generated" artifact is rendered from.
+          DROP = "    'meetnote': ['verify.yml'],\n"
+
+          # The doc calls itself generated, which reads as "drift is impossible here". It is
+          # rendered from the dict below -- hand-written, with extra steps. The check compares the
+          # markdown against the dict, so both sides come from ONE witness counted twice: a wrong
+          # dict produces a matching wrong doc and the assertion stays green. That is what happened.
+          OLD_LINE = ("        \"This file is generated from the backup repo's current workspace knowledge"
+                      " of repos that call `supercubegame/ci-workflows/.github/workflows/report.yml`.\",\n")
+          NEW_LINE = ("        \"This file is rendered from the CONSUMER_FILES dict in verify.py -- repos that"
+                      " call `supercubegame/ci-workflows/.github/workflows/report.yml`.\",\n"
+                      "        '**It is not derived from those repos.** The gate compares this file against that'\n"
+                      "        ' dict, so both sides are one witness counted twice: a wrong dict renders a matching'\n"
+                      "        ' wrong file and the check stays green. That happened -- meetnote sat in the dict for'\n"
+                      "        ' weeks while its verify.yml wrote back on its own. A real derivation needs a'\n"
+                      "        ' cross-repo token, which this offline gate does not have.',\n")
+
+          src = open(TARGET, encoding='utf-8').read()
+          before = src.encode()
+          print('target', TARGET)
+          print('bytes ', len(before))
+          print('blob  ', blob(before))
+
+          for name, s, want in (('drop-line', DROP, 1), ('doc-line', OLD_LINE, 1)):
+              n = src.count(s)
+              assert n == want, '%s appears %d times, expected %d' % (name, n, want)
+          assert 'meetnote' in src
+
+          out = src.replace(DROP, '', 1).replace(OLD_LINE, NEW_LINE, 1)
+          after = out.encode()
+
+          a, b = src.split('\n'), out.split('\n')
+          gone = [l for l in a if l not in b]
+          assert sorted(gone) == sorted([DROP.rstrip('\n'), OLD_LINE.rstrip('\n')]), \
+              'lines lost beyond the two named edits: %r' % gone[:4]
+          keep = [l for l in a if l not in (DROP.rstrip('\n'), OLD_LINE.rstrip('\n'))]
+          i = 0
+          for line in keep:
+              while i < len(b) and b[i] != line:
+                  i += 1
+              assert i < len(b), 'original line did not survive in order: %r' % line[:80]
+              i += 1
+          print('lines %d -> %d' % (len(a), len(b)))
+          print('survived in order: %d of %d' % (len(keep), len(a)))
+          print('edits: 1 deletion (meetnote) + 1 rewrite (the overclaiming label)')
+          print('LINE-SURVIVAL PROOF OK')
+
+          # Re-render the doc using the PATCHED file's own renderer, not a second copy of it.
+          # A second copy is the disease this whole change is about.
+          lo = out.index('CONSUMER_FILES = {')
+          hi = out.index("    return '\\n'.join(lines).rstrip() + '\\n'\n", lo)
+          hi += len("    return '\\n'.join(lines).rstrip() + '\\n'\n")
+          slice_ = out[lo:hi]
+          slice_ = '\n'.join(l for l in slice_.split('\n') if 'consumer_path' not in l)
+          ns = {}
+          exec(slice_, ns)
+          doc = ns['render_consumers']()
+          print('rendered doc: %d repos / %d workflows' % (ns['expected_repo_count'], ns['expected_workflow_count']))
+          assert ns['expected_repo_count'] == 6 and ns['expected_workflow_count'] == 11, \
+              'expected 6 repos / 11 workflows after dropping meetnote, got %d / %d' % (
+                  ns['expected_repo_count'], ns['expected_workflow_count'])
+          # The real property: not an entry. The word still appears in the prose that explains
+          # why it was removed, and forbidding that would forbid the explanation.
+          assert 'meetnote' not in ns['CONSUMER_FILES'], 'meetnote is still a dict entry'
+          assert not any('meetnote' in l for l in doc.split(chr(10)) if l.startswith('## ')), \
+              'meetnote still has a section in the rendered doc'
+
+          if '--check' in sys.argv:
+              print('check only, not writing')
+              sys.exit(0)
+
+          open(TARGET, 'w', encoding='utf-8').write(out)
+          open(DOC, 'w', encoding='utf-8').write(doc)
+          print('verify.py new bytes', len(after), 'blob', blob(after))
+          print('doc new bytes', len(doc.encode()), 'blob', blob(doc.encode()))
+
+          # Refresh both registered hashes: full readback -> targeted field mutation -> whole-file
+          # reserialize. Never hand-typed, because a 40-hex digit is exactly what the hand channel
+          # gets wrong.
+          raw = open(MANIFEST, encoding='utf-8').read()
+          obj = json.loads(raw)
+          reg = obj['docs_integrity']
+          touched = {}
+          for rel in (TARGET, DOC):
+              assert rel in reg, '%s is not registered, refusing to invent an entry' % rel
+              old, new = reg[rel], blob(open(rel, 'rb').read())
+              assert old != new, '%s hash did not change -- the edit did not land' % rel
+              reg[rel] = new
+              touched[rel] = (old, new)
+          outm = json.dumps(obj, ensure_ascii=False, indent=2) + '\n'
+          a2, b2 = json.loads(raw), json.loads(outm)
+          assert a2.keys() == b2.keys(), 'top-level keys changed'
+          for k in a2:
+              if k != 'docs_integrity':
+                  assert a2[k] == b2[k], 'unrelated key changed: %s' % k
+          assert set(a2['docs_integrity']) == set(b2['docs_integrity']), 'registry key set changed'
+          diff = [k for k in a2['docs_integrity'] if a2['docs_integrity'][k] != b2['docs_integrity'][k]]
+          assert sorted(diff) == sorted(touched), 'unexpected hash changes: %r' % diff
+          open(MANIFEST, 'w', encoding='utf-8').write(outm)
+          for rel, (old, new) in sorted(touched.items()):
+              print('refreshed %-40s %s -> %s' % (rel, old[:12], new[:12]))
+          print('HASHES REFRESHED, EXACTLY 2')
+          PYEOF
+      - name: run the real gate, and carry its output onto the same log
+        id: gate
+        if: steps.patch.outcome == 'success'
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          {
+            set -eo pipefail
+            python3 verify.py
+          } 2>&1 | tee -a artifacts/fix-consumer-set.log
+          echo 'GATE OK' | tee -a artifacts/fix-consumer-set.log
+      - name: commit and push branch
+        if: steps.patch.outcome == 'success' && steps.gate.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="fix/consumer-set-$(date -u +%Y%m%d%H%M%S)"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout -b "$branch"
+          git add "${{ inputs.path }}" docs/SHARED-WRITEBACK-CONSUMERS.md manifest.json
+          git commit -m "fix: meetnote is not a shared-writeback consumer"
+          git push origin "$branch"
+          echo "branch pushed: $branch"
+          echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
+      - name: upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report-consumer-set
+          path: artifacts/
+          if-no-files-found: error
+      - name: fail if either step failed
+        if: steps.patch.outcome != 'success' || steps.gate.outcome != 'success'
+        run: exit 1
