@@ -3,8 +3,15 @@ import hashlib, json, os, sys
 def blob(raw):
     return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
 
-def dec(s):
-    return json.loads('"' + s + '"')
+# The payload file is written with json.dumps(..., ensure_ascii=True), so json.load already
+# returns the real strings: there is no second decode. Run #3 failed exactly here. The local twin
+# had passed because its copy of this file was built by json.dump-ing ALREADY-ESCAPED strings,
+# which double-escapes them, so a second decode was needed there and only there.
+#
+# The lesson is not "decode carefully". It is that the twin was fed a DIFFERENT FILE than
+# production while I called both of them "the payload file". A twin that does not consume the
+# exact bytes production consumes is not a twin. The twin now reads the landed bytes, blob
+# 0b8922e8, verified before this fix was written.
 
 TARGET = os.environ.get('TARGET', 'verify.py')
 DOC = 'docs/SHARED-WRITEBACK-CONSUMERS.md'
@@ -13,8 +20,8 @@ MANIFEST = 'manifest.json'
 NEW_ID = 'consumer_set_self_derived'
 
 P = json.load(open('.github/payloads/self-derive-payloads.json', encoding='ascii'))
-NEWCHECK = dec(P['NEWCHECK'])
-SECT = dec(P['SECT'])
+NEWCHECK = P['NEWCHECK']
+SECT = P['SECT']
 
 # ---- verify.py: three pure insertions, each anchored on a line that is unique in the file
 DICT_ANCHOR = "    'crossyroad': ['verify.yml'],\n"
@@ -84,24 +91,24 @@ print('doc bytes %d (expected %d) blob %s (expected %s)' % (bz2, EXPECT_DOC_BYTE
 assert (gb2, bz2) == (EXPECT_DOC_BLOB, EXPECT_DOC_BYTES), 'the rendered doc is not the one that was predicted'
 
 # ---- MINIMAL-GATE: three counts, plus one new section. Targeted replaces, because a blanket
-# 20 -> 21 would corrupt every date containing 20 (2026-08-26 and friends).
+# 20 -> 21 would corrupt every date containing 20, starting with 2026-08-26.
 gsrc = open(GATE_DOC, encoding='utf-8').read()
 gb = gsrc.encode()
 print('gate doc', len(gb), 'bytes  blob', blob(gb))
-pairs = [('heading', dec(P['H_OLD']), dec(P['H_NEW'])),
-         ('section-note', dec(P['N_OLD']), dec(P['N_NEW'])),
-         ('closing', dec(P['T_OLD']), dec(P['T_NEW']))]
+pairs = [('heading', P['H_OLD'], P['H_NEW']),
+         ('section-note', P['N_OLD'], P['N_NEW']),
+         ('closing', P['T_OLD'], P['T_NEW'])]
 for nm, o, n in pairs:
     c = gsrc.count(o)
     assert c == 1, 'gate %s anchor appears %d times, expected 1' % (nm, c)
 gout = gsrc
 for nm, o, n in pairs:
     gout = gout.replace(o, n, 1)
-ANCH = dec(P['ANCHOR'])
+ANCH = P['ANCHOR']
 assert gout.count(ANCH) == 1, 'gate section anchor not unique'
 gout = gout.replace(ANCH, ANCH + '\n\n' + SECT.rstrip('\n'), 1)
-assert gout.count(dec(P['H_NEW'])) == 1 and gout.count(dec(P['T_NEW'])) == 1
-assert dec(P['H_OLD']) not in gout and dec(P['T_OLD']) not in gout
+assert gout.count(P['H_NEW']) == 1 and gout.count(P['T_NEW']) == 1
+assert P['H_OLD'] not in gout and P['T_OLD'] not in gout
 assert '### 18.' in gout, 'new section heading missing'
 ga, gbl = gsrc.split('\n'), gout.split('\n')
 lost = [l for l in ga if l not in gbl]
