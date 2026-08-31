@@ -485,6 +485,60 @@ else:
               if ok else f'真文件里有而登记里没有：{miss or "无"} · 登记了而真文件里没有：{ghost or "无"}')
 check('consumer_set_self_derived', '本仓那一项由真文件派生（不是手写）', ok, detail)
 
+README_PAIR = ('README.md', 'README_CN.md')
+QUICK_HEADS = {'README.md': '## Quick Install', 'README_CN.md': '## \u5feb\u901f\u5f00\u59cb'}
+# Load-bearing facts a stranger cannot infer. Each was a real documentation gap found by
+# docs/STRANGER-WALKTHROUGH-0001.md, so these are the sentences that must exist in BOTH.
+PARITY_TOKENS = ('Allow GitHub Actions to create and approve pull requests',
+                 'Read and write permissions',
+                 'STRANGER-WALKTHROUGH-0001.md')
+
+def quick_steps(path, head):
+    if not path.exists():
+        return None
+    lines = path.read_text(encoding='utf-8', errors='replace').splitlines()
+    try:
+        i = next(k for k, l in enumerate(lines) if l.strip() == head)
+    except StopIteration:
+        return None
+    out = []
+    for l in lines[i + 1:]:
+        if l.startswith('## '):
+            break
+        m = re.match(r'^(\d+)\.\s', l)
+        if m:
+            out.append(int(m.group(1)))
+    return out
+
+bad = []
+counts = {}
+for rel in README_PAIR:
+    steps = quick_steps(ROOT / rel, QUICK_HEADS[rel])
+    if steps is None:
+        bad.append('%s: read no Quick Install section under %r' % (rel, QUICK_HEADS[rel]))
+        continue
+    if len(steps) < 5:
+        bad.append('%s: only %d numbered steps parsed -- too few to be the real list, so this check would be empty' % (rel, len(steps)))
+        continue
+    if steps != list(range(1, len(steps) + 1)):
+        bad.append('%s: step numbers are not 1..N: %r' % (rel, steps))
+        continue
+    counts[rel] = len(steps)
+missing = {}
+if len(counts) == len(README_PAIR):
+    if len(set(counts.values())) != 1:
+        bad.append('Quick Install step counts differ: %r -- a doc fix did not cross the translation' % counts)
+    for rel in README_PAIR:
+        gone = [t for t in PARITY_TOKENS if t not in (ROOT / rel).read_text(encoding='utf-8', errors='replace')]
+        if gone:
+            missing[rel] = gone
+    if missing:
+        bad.append('load-bearing setup facts missing: %r -- these were real stranger-walkthrough gaps' % missing)
+ok = not bad
+detail = ('two READMEs agree: %d Quick Install steps each, %d load-bearing setup facts in both'
+          % (counts.get(README_PAIR[0], 0), len(PARITY_TOKENS))) if ok else '; '.join(bad)
+check('readme_pair_parity', '\u4e24\u4efd README \u7684\u5feb\u901f\u5f00\u59cb\u6b65\u9aa4\u4e0e\u627f\u91cd\u4e8b\u5b9e\u5bf9\u5f97\u4e0a', ok, detail)
+
 declared_checks = ((manifest.get('checks') or {}).get('verify'))
 actual_checks = len(checks) + 1
 gate_doc = ROOT / 'docs' / 'MINIMAL-GATE.md'
