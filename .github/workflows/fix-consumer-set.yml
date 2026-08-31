@@ -1,5 +1,11 @@
 name: fix-consumer-set
 
+# 2026-08-31: this file is a rewrite, not a new file. The previous tool here dropped meetnote
+# from CONSUMER_FILES and it is used up: its own guards assert the meetnote line is present, so
+# it now refuses to run. Rewriting in place is also the only channel that works. Adding a NEW
+# workflow needs a new manifest registry line, and every tool that could add one is itself a new
+# workflow -- the toolbox deadlock. Editing a file that is ALREADY registered leaves the
+# directory set unchanged and makes exactly one hash stale, which refresh-integrity can fix.
 on:
   workflow_dispatch:
     inputs:
@@ -12,7 +18,7 @@ permissions: {}
 
 jobs:
   patch:
-    name: drop a repo that is not a consumer, and stop calling the artifact generated
+    name: add the three CI patchers this list never counted
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
@@ -29,7 +35,7 @@ jobs:
           set -o pipefail
           mkdir -p artifacts
           python3 - 2>&1 <<'PYEOF' | tee artifacts/fix-consumer-set.log
-          import hashlib, json, os, re, sys
+          import hashlib, json, os, sys
 
           def blob(raw):
               return hashlib.sha1(b'blob %d\x00' % len(raw) + raw).hexdigest()
@@ -38,25 +44,27 @@ jobs:
           DOC = 'docs/SHARED-WRITEBACK-CONSUMERS.md'
           MANIFEST = 'manifest.json'
 
-          # meetnote is not a consumer. Read 2026-08-30 from its real verify.yml: it writes back
-          # itself with actions/github-script@v7 and contains no `uses:` of the shared workflow at
-          # all. The hand-written ledger in docs/DEPENDENCIES.md says so correctly; this dict says
-          # otherwise, and the dict is what the "generated" artifact is rendered from.
-          DROP = "    'meetnote': ['verify.yml'],\n"
+          # Read 2026-08-31 from the real files on clickup-brain-backup main: all six workflows in
+          # .github/workflows carry `uses: supercubegame/ci-workflows/.github/workflows/report.yml@main`.
+          # The dict listed three. The three missing ones are CI patchers built after the dict was
+          # written, so the "generated" file has been under-counting its own home repo.
+          ADDED = ['fix-confusable.yml', 'patch-heartbeat-gap.yml', 'patch-yaml-shape.yml']
 
-          # The doc calls itself generated, which reads as "drift is impossible here". It is
-          # rendered from the dict below -- hand-written, with extra steps. The check compares the
-          # markdown against the dict, so both sides come from ONE witness counted twice: a wrong
-          # dict produces a matching wrong doc and the assertion stays green. That is what happened.
-          OLD_LINE = ("        \"This file is generated from the backup repo's current workspace knowledge"
-                      " of repos that call `supercubegame/ci-workflows/.github/workflows/report.yml`.\",\n")
-          NEW_LINE = ("        \"This file is rendered from the CONSUMER_FILES dict in verify.py -- repos that"
-                      " call `supercubegame/ci-workflows/.github/workflows/report.yml`.\",\n"
-                      "        '**It is not derived from those repos.** The gate compares this file against that'\n"
-                      "        ' dict, so both sides are one witness counted twice: a wrong dict renders a matching'\n"
-                      "        ' wrong file and the check stays green. That happened -- meetnote sat in the dict for'\n"
-                      "        ' weeks while its verify.yml wrote back on its own. A real derivation needs a'\n"
-                      "        ' cross-repo token, which this offline gate does not have.',\n")
+          OLD_DICT = "    'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml'],\n"
+          NEW_DICT = ("    'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml',\n"
+                      "                             'fix-confusable.yml', 'patch-heartbeat-gap.yml',\n"
+                      "                             'patch-yaml-shape.yml'],\n")
+
+          # The doc already admits it is rendered, not derived. What it did not say is that the
+          # failure it warned about had happened AGAIN, in the other direction: not a phantom
+          # consumer, a missing one.
+          OLD_PROSE = ("        'It exists because a hand-maintained prose list already missed real consumers twice,"
+                       " and the first version of this generated list missed one again.',\n")
+          NEW_PROSE = (OLD_PROSE.rstrip('\n') + '\n'
+                       "        'Read 2026-08-31 from the real files: clickup-brain-backup calls it from six workflows, not'\n"
+                       "        ' three. The three CI patchers were added after this dict was written, and an offline gate'\n"
+                       "        ' cannot see a repo grow a new caller -- so the generated file has now under-counted its own'\n"
+                       "        ' home repo, which is the third time this list was wrong in the same direction.',\n")
 
           src = open(TARGET, encoding='utf-8').read()
           before = src.encode()
@@ -64,32 +72,43 @@ jobs:
           print('bytes ', len(before))
           print('blob  ', blob(before))
 
-          for name, s, want in (('drop-line', DROP, 1), ('doc-line', OLD_LINE, 1)):
+          for name, s in (('dict-line', OLD_DICT), ('prose-line', OLD_PROSE)):
               n = src.count(s)
-              assert n == want, '%s appears %d times, expected %d' % (name, n, want)
-          assert 'meetnote' in src
+              assert n == 1, '%s appears %d times, expected 1' % (name, n)
+          for wf in ADDED:
+              assert wf not in src, 'already lists %s' % wf
 
-          out = src.replace(DROP, '', 1).replace(OLD_LINE, NEW_LINE, 1)
+          out = src.replace(OLD_DICT, NEW_DICT, 1).replace(OLD_PROSE, NEW_PROSE, 1)
           after = out.encode()
+          assert len(after) > len(before), 'file must grow'
 
+          # Line survival: every original line must reappear in order, and exactly one may vanish.
+          # "Most lines survived" is how a guard quietly stops guarding.
+          #
+          # Only the dict line is REPLACED. The prose line is EXTENDED -- NEW_PROSE opens with that
+          # same line verbatim -- so it must survive, and asserting it disappeared would have been
+          # a guard describing a property this patch does not have. The first local run said so.
           a, b = src.split('\n'), out.split('\n')
+          GONE_EXPECT = [OLD_DICT.rstrip('\n')]
           gone = [l for l in a if l not in b]
-          assert sorted(gone) == sorted([DROP.rstrip('\n'), OLD_LINE.rstrip('\n')]), \
-              'lines lost beyond the two named edits: %r' % gone[:4]
-          keep = [l for l in a if l not in (DROP.rstrip('\n'), OLD_LINE.rstrip('\n'))]
+          assert sorted(gone) == sorted(GONE_EXPECT), 'lines lost beyond the one named rewrite: %r' % gone[:4]
+          keep = [l for l in a if l not in GONE_EXPECT]
           i = 0
           for line in keep:
               while i < len(b) and b[i] != line:
                   i += 1
               assert i < len(b), 'original line did not survive in order: %r' % line[:80]
               i += 1
+          added = [l for l in b if l not in a]
+          assert len(added) == 7, 'expected 7 new lines (3 dict + 4 prose), got %d: %r' % (len(added), added[:8])
+          assert len(b) == len(a) + 6, 'expected net +6 lines, got %+d' % (len(b) - len(a))
           print('lines %d -> %d' % (len(a), len(b)))
           print('survived in order: %d of %d' % (len(keep), len(a)))
-          print('edits: 1 deletion (meetnote) + 1 rewrite (the overclaiming label)')
+          print('edits: 1 dict line replaced by 3 (3 files -> 6) + 1 prose line extended by 4')
           print('LINE-SURVIVAL PROOF OK')
 
-          # Re-render the doc using the PATCHED file's own renderer, not a second copy of it.
-          # A second copy is the disease this whole change is about.
+          # Re-render with the PATCHED file's own renderer. A second copy of the renderer in this
+          # tool would be the exact disease this repo keeps logging.
           lo = out.index('CONSUMER_FILES = {')
           hi = out.index("    return '\\n'.join(lines).rstrip() + '\\n'\n", lo)
           hi += len("    return '\\n'.join(lines).rstrip() + '\\n'\n")
@@ -98,15 +117,25 @@ jobs:
           ns = {}
           exec(slice_, ns)
           doc = ns['render_consumers']()
-          print('rendered doc: %d repos / %d workflows' % (ns['expected_repo_count'], ns['expected_workflow_count']))
-          assert ns['expected_repo_count'] == 6 and ns['expected_workflow_count'] == 11, \
-              'expected 6 repos / 11 workflows after dropping meetnote, got %d / %d' % (
-                  ns['expected_repo_count'], ns['expected_workflow_count'])
-          # The real property: not an entry. The word still appears in the prose that explains
-          # why it was removed, and forbidding that would forbid the explanation.
-          assert 'meetnote' not in ns['CONSUMER_FILES'], 'meetnote is still a dict entry'
-          assert not any('meetnote' in l for l in doc.split(chr(10)) if l.startswith('## ')), \
-              'meetnote still has a section in the rendered doc'
+          repos, wfs = ns['expected_repo_count'], ns['expected_workflow_count']
+          print('rendered doc: %d repos / %d workflows' % (repos, wfs))
+          assert (repos, wfs) == (6, 14), 'expected 6 repos / 14 workflows, got %d / %d' % (repos, wfs)
+
+          # Independently predicted before this ran, from a local twin of the renderer that first
+          # reproduced the OLD doc byte for byte. Two witnesses, not one.
+          EXPECT_DOC_BLOB = '19b180f394603b335888e74bf6d4307f3235a126'
+          EXPECT_DOC_BYTES = 1702
+          got_blob, got_bytes = blob(doc.encode()), len(doc.encode())
+          print('doc bytes %d (expected %d) blob %s (expected %s)' % (got_bytes, EXPECT_DOC_BYTES, got_blob, EXPECT_DOC_BLOB))
+          assert (got_blob, got_bytes) == (EXPECT_DOC_BLOB, EXPECT_DOC_BYTES), 'the rendered doc is not the one that was predicted'
+
+          backup = ns['CONSUMER_FILES']['clickup-brain-backup']
+          assert len(backup) == len(set(backup)) == 6, 'the backup repo entry is not 6 distinct files: %r' % backup
+          for wf in ADDED:
+              assert backup.count(wf) == 1, '%s is not in the entry exactly once' % wf
+              assert ('- `.github/workflows/%s`' % wf) in doc, '%s is missing from the rendered doc' % wf
+          heads = [l for l in doc.split(chr(10)) if l.startswith('## ')]
+          assert len(heads) == 6, 'expected 6 repo sections, got %d' % len(heads)
 
           if '--check' in sys.argv:
               print('check only, not writing')
@@ -115,11 +144,9 @@ jobs:
           open(TARGET, 'w', encoding='utf-8').write(out)
           open(DOC, 'w', encoding='utf-8').write(doc)
           print('verify.py new bytes', len(after), 'blob', blob(after))
-          print('doc new bytes', len(doc.encode()), 'blob', blob(doc.encode()))
 
-          # Refresh both registered hashes: full readback -> targeted field mutation -> whole-file
-          # reserialize. Never hand-typed, because a 40-hex digit is exactly what the hand channel
-          # gets wrong.
+          # Full readback -> targeted field mutation -> whole-file reserialize. A 40-hex digit is
+          # exactly what the hand channel gets wrong, so it is never typed.
           raw = open(MANIFEST, encoding='utf-8').read()
           obj = json.loads(raw)
           reg = obj['docs_integrity']
@@ -166,7 +193,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b "$branch"
           git add "${{ inputs.path }}" docs/SHARED-WRITEBACK-CONSUMERS.md manifest.json
-          git commit -m "fix: meetnote is not a shared-writeback consumer"
+          git commit -m "fix: the backup repo calls the shared writeback from six workflows, not three"
           git push origin "$branch"
           echo "branch pushed: $branch"
           echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
