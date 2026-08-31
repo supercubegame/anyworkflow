@@ -199,7 +199,7 @@ jobs:
           echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
       - name: upload report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: report-consumer-set
           path: artifacts/
