@@ -36,6 +36,7 @@
     "confusables_blacklist": true,
     "cross_copy_consistency": true,
     "shared_writeback_consumers_generated": true,
+    "consumer_set_self_derived": true,
     "prompt_archive_split": true,
     "invariants_match_checks": true,
     "checks_count_equals": true
@@ -55,7 +56,7 @@
     "docs/INCIDENT-LEDGER.md": "43a8f6b796dc8fcfed22e135bf1322b6cce89623",
     "docs/INDEX.md": "e63acd891e21ed1279d5c2697ec7682ec06ab5a8",
     "docs/LIVE-READBACK-LEDGER.md": "f1baecd9e4becace2e2a828afb0b9231f320c546",
-    "docs/MINIMAL-GATE.md": "99903055f27adf66d7481249722c85a58de0bc12",
+    "docs/MINIMAL-GATE.md": "4e3543d9a11631bd14808a11486396e55ce01725",
     "docs/OBSERVER-PROMPTS.md": "9ef45ac37bac7fdc2a942c7d1a4d3cf6e0d635b6",
     "docs/QUINN-FIELD-NOTES.md": "bfefe01f556936cb934ac409f8f2080e0e7c0453",
     "docs/OBSERVERS.md": "00f94d70c0faf1a303a295cee906c2486d9ffe9d",
@@ -67,14 +68,14 @@
     "docs/RESTORE-DRILL-0001.md": "78ee365ce8fac5f9eba692952da288ed5b650f7a",
     "docs/RESTORE-DRILL-TEMPLATE.md": "8a72ed13b5fc759ece1174af3f5b208eb944926e",
     "docs/SETUP-CHECKLIST.md": "4d2a94d09c833df45c3ae1fa98328c4c9e794c5c",
-    "docs/SHARED-WRITEBACK-CONSUMERS.md": "19b180f394603b335888e74bf6d4307f3235a126",
+    "docs/SHARED-WRITEBACK-CONSUMERS.md": "0582e38dcfd7f1198c7bfcb2e576dd34feae1bda",
     "docs/STRANGER-WALKTHROUGH-0001.md": "6f626aa31178776825f0d94da229f637f91d3607",
     "docs/SUMMARY-TRIGGER-EVIDENCE-0001.md": "7c0ac5a9a4cb0e7d17cf1035efcbd2c240437536",
     "docs/VERIFY-EVIDENCE-0001.md": "aa14f38510b0d479717626729c73748beb86951a",
     "docs/VERIFY-EVIDENCE-0002.md": "a2e3dd6a1840f8bc971da3063f6b6a27478f0446",
     "scripts/attest_delivery.py": "47e5b1c24740a0c20cd27e155c97022b65042fba",
     "scripts/compose-report.mjs": "021c2392958b837eeb3fd36112f4d2b92856f749",
-    "verify.py": "3f05817a5b4d84547d498726759e0bd4e8621317",
+    "verify.py": "0ad5c95434f167446a5505c99df8b5c73e7dab48",
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "f2bee345da06bbfb0f5a007ddfdb0961fd44cbe5",
     "agents/gate-audit-quinn.md": "a6cbf6778256b1ba0e6a0a416153df11c690b636",
@@ -272,7 +273,7 @@
   "obligations": [],
   "_obligations": "带期限的义务。宽限期内只报剩多少天，过期判红。**到期只有两个正确反应，都不是把日期往后挑**：真的做完了（删记录），或者确认做不到（挑进 _tested_limits）。**做完了还挂着也判红** —— 一份挂着已完成事项的清单，没人会再读它。",
   "checks": {
-    "verify": 20
+    "verify": 21
   },
   "_checks": "等号，不是下限。下限型的计数会自己漂。而它同时钉着 docs/MINIMAL-GATE.md 里那个数。这次从 19 变 20，就是因为新增了 prompt_archive_split 那条。"
 }

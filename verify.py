@@ -355,6 +355,7 @@ CONSUMER_FILES = {
     'jumpwow': ['verify.yml'],
     'image-grabber': ['verify.yml'],
     'crossyroad': ['verify.yml'],
+    'anyworkflow': ['verify.yml'],
 }
 consumer_path = ROOT / 'docs' / 'SHARED-WRITEBACK-CONSUMERS.md'
 expected_repo_count = len(CONSUMER_FILES)
@@ -375,6 +376,11 @@ def render_consumers():
         ' three. The three CI patchers were added after this dict was written, and an offline gate'
         ' cannot see a repo grow a new caller -- so the generated file has now under-counted its own'
         ' home repo, which is the third time this list was wrong in the same direction.',
+        'Read 2026-08-31 again, hours later: anyworkflow itself calls the shared writeback from its'
+        ' own verify.yml, and this dict had never listed it -- the fourth error, and the one where'
+        ' the list omitted the repo it lives in. That entry is now derived from the real files on'
+        ' disk, so it is the only truly derived line here; the other six repos are still hand-written'
+        ' because deriving them needs a cross-repo token.',
         '',
         f'- Repositories: **{expected_repo_count}**',
         f'- Workflow files: **{expected_workflow_count}**',
@@ -455,6 +461,29 @@ elif unregistered or orphaned:
 else:
     ok, detail = True, f'{len(actual_inv)} 条检查与声明集合完全重合（按 id 从源码扫，不按标题、不按顺序）'
 check('invariants_match_checks', 'manifest.invariants 与实际检查集合相等', ok, detail)
+
+CONSUMER_SHARED_CALL = 'supercubegame/ci-workflows/.github/workflows/report.yml'
+SELF_WF_DIR = ROOT / '.github' / 'workflows'
+self_wf_files = sorted(f for f in SELF_WF_DIR.glob('*.yml') if f.is_file())
+self_derived = sorted(f.name for f in self_wf_files
+                      if CONSUMER_SHARED_CALL in f.read_text(encoding='utf-8', errors='replace'))
+self_entry = CONSUMER_FILES.get('anyworkflow')
+self_listed = sorted(self_entry or [])
+if not self_wf_files:
+    ok, detail = False, '本仓 .github/workflows 下一个 .yml 都没读到 —— 这条派生当场变空'
+elif not self_derived:
+    ok, detail = False, (f'扫了 {len(self_wf_files)} 份 workflow，一份都没引用共享回写 —— 而本仓的 verify.yml 确实在用它，所以这是扫描器坏了，不是世界变了')
+elif self_entry is None:
+    ok, detail = False, ("CONSUMER_FILES 里没有 'anyworkflow' 这一项 —— 那份清单漏掉了它自己所在的仓")
+elif not self_listed:
+    ok, detail = False, ("CONSUMER_FILES['anyworkflow'] 是空列表 —— 一个空登记会让这条派生当场变空，而真文件里有 %d 份在调用它" % len(self_derived))
+else:
+    miss = sorted(set(self_derived) - set(self_listed))
+    ghost = sorted(set(self_listed) - set(self_derived))
+    ok = not miss and not ghost
+    detail = (f'本仓 {len(self_wf_files)} 份 workflow 里 {len(self_derived)} 份真的在调用共享回写，与登记逐项重合：{self_derived}'
+              if ok else f'真文件里有而登记里没有：{miss or "无"} · 登记了而真文件里没有：{ghost or "无"}')
+check('consumer_set_self_derived', '本仓那一项由真文件派生（不是手写）', ok, detail)
 
 declared_checks = ((manifest.get('checks') or {}).get('verify'))
 actual_checks = len(checks) + 1
