@@ -14,12 +14,11 @@ permissions: {}
 
 jobs:
   renew:
-    name: patch readback_at and open PR
+    name: patch readback_at and push a branch
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
-      pull-requests: write
     steps:
       - uses: actions/checkout@v5
       - name: patch two fields only
@@ -70,9 +69,15 @@ jobs:
           print('quinn', old_q, '->', q)
           print('devon', old_d, '->', d)
           PY
-      - name: commit and open PR
+      # 2026-08-31: gh pr create was removed, not fixed. Run #5 died on
+      # 'GitHub Actions is not permitted to create or approve pull requests', which is a
+      # repo/org setting no job-level permission can grant. The patch and the push had
+      # already succeeded, so the only thing that step contributed was a red cross whose
+      # cause had nothing to do with the output. Pushing the branch IS the success
+      # condition now; opening the PR is a human step, and saying so is cheaper than
+      # keeping a step that always fails.
+      - name: commit and push a branch
         env:
-          GH_TOKEN: ${{ github.token }}
           QUINN_AT: ${{ inputs.quinn_at }}
           DEVON_AT: ${{ inputs.devon_at }}
         shell: bash
@@ -89,17 +94,9 @@ jobs:
           git add manifest.json
           git commit -m "sync: renew agent copy readback_at (CI-side patch, no hand-copied bytes)"
           git push origin "$branch"
-          {
-            echo 'Patched in CI against the checkout, so the manifest never passes through a hand-retyped copy.'
-            echo ''
-            echo "- Quinn readback_at -> ${QUINN_AT}"
-            echo "- Devon readback_at -> ${DEVON_AT}"
-            echo ''
-            echo 'The patch script asserts exactly two changed fields, identical key sets, and unchanged byte length.'
-            echo 'It prints the base blob and the new blob, so the run log is self-proving.'
-            echo ''
-            echo "run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
-          } > /tmp/pr.md
-          gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$branch" \
-            --title 'sync: renew agent copy readback_at' \
-            --body-file /tmp/pr.md
+          echo "branch pushed: $branch"
+          echo "- Quinn readback_at -> ${QUINN_AT}"
+          echo "- Devon readback_at -> ${DEVON_AT}"
+          echo 'The patch step asserts exactly two changed fields, identical key sets, and'
+          echo 'unchanged byte length, and prints both blobs, so this log is self-proving.'
+          echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
