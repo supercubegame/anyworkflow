@@ -347,7 +347,9 @@ else:
 check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期限的义务）', ok, detail)
 
 CONSUMER_FILES = {
-    'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml'],
+    'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml',
+                             'fix-confusable.yml', 'patch-heartbeat-gap.yml',
+                             'patch-yaml-shape.yml'],
     'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
     'flappycat': ['verify.yml'],
     'jumpwow': ['verify.yml'],
@@ -369,6 +371,10 @@ def render_consumers():
         ' weeks while its verify.yml wrote back on its own. A real derivation needs a'
         ' cross-repo token, which this offline gate does not have.',
         'It exists because a hand-maintained prose list already missed real consumers twice, and the first version of this generated list missed one again.',
+        'Read 2026-08-31 from the real files: clickup-brain-backup calls it from six workflows, not'
+        ' three. The three CI patchers were added after this dict was written, and an offline gate'
+        ' cannot see a repo grow a new caller -- so the generated file has now under-counted its own'
+        ' home repo, which is the third time this list was wrong in the same direction.',
         '',
         f'- Repositories: **{expected_repo_count}**',
         f'- Workflow files: **{expected_workflow_count}**',
