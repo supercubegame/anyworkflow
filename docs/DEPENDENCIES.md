@@ -19,26 +19,19 @@
 ### 为什么这些是承重依赖
 - `clickup-brain-backup` 是台账与抄本中枢
 - `ci-workflows` 是共享回写的单点
-- 其余七个仓库里，**至少各有一份 workflow 的 `uses:` 真行在调用共享回写**。它们不是按名字猜的，是逐个读 `.github/workflows/*.yml` 里的真文件读回来的。
+- 其余仓库**多数**各有至少一份 workflow 的 `uses:` 真行在调用共享回写，**而 `meetnote` 是例外**：它的 `verify.yml` 用 `actions/github-script` 自己写回，一行调用共享回写的 `uses:` 都没有。它仍然是承重依赖（Quinn 每天点名看它），但**不是共享回写的消费者**。
+- 谁是消费者、各有几份，**只看 `docs/SHARED-WRITEBACK-CONSUMERS.md`**。这页不再复述那份清单。
 
 ### 这一节为什么重写
 原来这张表漏了 `crossyroad`。那不是小疏忽，是同一个形状的第二次：**手写清单永远追不上目录。**
 
 第一次是 `flappycat`：有人拿一条只扫本仓 workflow 的断言，去论证「多消费者分叉不会发生」，而恰好漏掉了一个已经在用 `@main` 的消费者。第二次就是这里：一张写着「哪些是承重仓库」的表，把一个真实消费者漏在外面，而整份备份仓没有任何东西会红。
 
-**正确修法不是“记得以后别漏”。** 这页现在直接把当次读回到的真值写出来：
+**而“记得以后别漏”这条修法，2026-08-31 被第三次否证了。** 原来这一节有一张手写表，写着「一共 15 份、分布在 7 个仓」，**而它自己列出来的只加得出 12 份**；`meetnote` 被算成了消费者，而它的 `verify.yml` 自己写回、没有一行调用共享回写；`TodoX` 那四份被写成「仍然钉在 f0fccd3f」，而它们早就跟着 `@main`。**三处假话住在同一节里，而整份备份仓没有任何东西会红。**
 
-- `clickup-brain-backup`: `split-apply.yml`、`split-dry-run.yml`、`verify.yml`
-- `TodoX`: `verify.yml`、`release.yml`、`screenshots.yml`、`mirror.yml`
-- `flappycat`: `verify.yml`
-- `meetnote`: `verify.yml`
-- `jumpwow`: `verify.yml`
-- `image-grabber`: `verify.yml`
-- `crossyroad`: `verify.yml`
+**所以那张表整段删掉了，不是把数字重打一遍。** 两份表就是这个病本身：补字只能把下一次漂移往后推。消费者集合的真值只有一处 —— `docs/SHARED-WRITEBACK-CONSUMERS.md`，它由 `verify.py` 里的 `CONSUMER_FILES` 渲染，**而两侧是否相等有一条断言在守**。
 
-一共 **15** 份 workflow 文件，分布在 **7** 个消费者仓库里。这个数字是这次读回来数的，不是拍脑袋写的。
-
-**但这页仍然不是机器派生的。** 它现在只是从“手写记忆”提升到了“带一次真读回的手写台账”。下次如果这些仓里又长出新的 workflow，这页**仍然会过期而全绿**。所以这张表最好的下一步不是继续补字，是把「消费者集合」本身变成一条断言或一份生成物。
+**那份生成物也不是真派生的，这一点必须写清，别拿它当闭合。** 它渲染自一份手写字典，所以「字典错了就渲染出一份配套错的文件而检查照绿」这条路仍然开着 —— 而它真的走过两次：先是 `meetnote` 在字典里挂了几周，后来是三个 CI 补丁器一份都没被数进去。真正的派生需要跨仓令牌，而这道离线闸门没有。**它唯一强过这页的地方是：相等这件事有断言，而这页从来没有。**
 
 ## 二、共享 workflow 依赖
 
@@ -55,14 +48,12 @@
 - 但归档拷贝只证明“上次读回时它长这样”，证明不了远端主干此刻还是这样
 - 所以需要外部观察者和带期限的读回时间戳
 
-### 当下读回到的真实消费者分布
-按这次逐仓读回 `.github/workflows/*.yml` 的真实 `uses:` 行：
+### 版本策略：分叉已经没有了
+2026-08-31 逐仓读回真文件：**六个消费者仓的 14 份 workflow 全部跟随 `@main`，一处 pin SHA 都不剩。**
 
-- **跟随 `@main`**：`clickup-brain-backup`（3 份）、`flappycat`（1 份）、`jumpwow`（1 份）、`image-grabber`（1 份）、`crossyroad`（1 份）
-- **仍然钉在 `f0fccd3f`**：`TodoX` 的 `verify.yml`、`release.yml`、`screenshots.yml`、`mirror.yml`
-- **不走共享 reusable workflow，而是自己写回**：`meetnote` 的 `verify.yml`
+`TodoX` 那四份是 2026-08-16 从钉 SHA 改过来的，而 TodoX 自己的快闸门现在有一条断言要求那几行**恰好是 `@main`、且不许是 40 位 SHA** —— 防的正是有人偷偷钉回去。
 
-也就是说，这页现在能诚实地说：**版本策略真的还在分叉，而分叉目前集中在 TodoX。** 这不是从别的台账抄来的，是从那些仓自己的 workflow 真文件读回来的。
+**所以上面原来那句「分叉集中在 TodoX」是反的，而它在这页上活了两周。** 换个方向记：这页不再登记「谁跟哪个引用」，那件事归 TodoX 自己的断言和那份生成物。这页只登记**跟随 `@main` 的代价**，因为那条风险本仓断言覆盖不了 —— 上游改一行这边行为就跟着变，而闸门不会红。它的落点在仓外：备份仓 `manifest.writeback.upstream_read_at` 那道 30 天期限，以及 Quinn 每天读回上游主干。
 
 ## 三、ClickUp 真身依赖
 
