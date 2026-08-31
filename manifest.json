@@ -80,7 +80,7 @@
     "agents/gate-audit-quinn.md": "a6cbf6778256b1ba0e6a0a416153df11c690b636",
     "vendor/ci-workflows/report.yml": "6febc11e45ec6ca8526df487c6e8fc9e6d21c581",
     ".github/workflows/append-tested-limit.yml": "0d3238887344668b5099cc23c1649162107a68ee",
-    ".github/workflows/fix-consumer-set.yml": "3a58d83e14804a53d15a433c307fa3bfbbd89010",
+    ".github/workflows/fix-consumer-set.yml": "c659553e9dc05628f53ba66bdbc69a757d1e3c76",
     ".github/workflows/refresh-integrity.yml": "5a5dfd7826929fba8b7c936c9b1019ccaadf38b6",
     ".github/workflows/register-workflow-dir.yml": "0912039055a17e7068b196ce765532e9d5bbac28",
     ".github/workflows/renew-readback.yml": "0e5e55841b8e1bc93e943001eaef6c361b6b2a2f"
