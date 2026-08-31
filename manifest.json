@@ -83,7 +83,7 @@
     ".github/workflows/fix-consumer-set.yml": "3a58d83e14804a53d15a433c307fa3bfbbd89010",
     ".github/workflows/refresh-integrity.yml": "5a5dfd7826929fba8b7c936c9b1019ccaadf38b6",
     ".github/workflows/register-workflow-dir.yml": "0912039055a17e7068b196ce765532e9d5bbac28",
-    ".github/workflows/renew-readback.yml": "364f06925d2e7a3636bb8f4020fbde78858cdeec"
+    ".github/workflows/renew-readback.yml": "0e5e55841b8e1bc93e943001eaef6c361b6b2a2f"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。**而它守不住一件事**：抄本被掏空而哈希在同一次提交里跟着改了 —— 那一层由 true_copy_size_floor 守。",
   "docs_integrity_provenance": {
