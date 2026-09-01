@@ -1,39 +1,40 @@
 name: fix-consumer-set
 
-# 2026-08-31, third rewrite of this file today, and the name is now wrong -- it patches whatever
-# the current round needs, and renaming it would cost a manifest registry line plus a
-# refresh-integrity run for zero behaviour change. Registered as a known wart rather than
-# pretended away: the job name below says what this round actually does.
+# The name is wrong and stays wrong on purpose: this file is the repo's one already-registered
+# patch runner, and each round rewrites it in place. Renaming it would cost a registry line plus
+# a refresh-integrity round for zero behaviour change, so the job name below says what this round
+# actually does. Registered as a known wart rather than pretended away.
 #
-# Why rewrite in place, again: adding a NEW workflow needs a new registry line, and every tool
-# that could add one is itself a new workflow. Editing an already-registered file leaves the
-# directory set alone and makes exactly one hash stale, which refresh-integrity handles. That
-# path has now worked five times today.
+# Why rewrite in place rather than add a new workflow: a new file in .github/workflows breaks the
+# directory-equals-registry check, and every tool that could register it is itself a new workflow.
+# Editing an already-registered file leaves the directory set alone and makes exactly one hash
+# stale -- and this round's script refreshes that one hash itself, from the real bytes on disk.
 #
-# This round: nothing asserted that the two READMEs describe the same steps. AGENTS.md and
-# CLAUDE.md have a byte-identity check precisely because two copies drift; the READMEs cannot be
-# byte-identical, so they got no check at all -- and drifted for a week. The stranger walkthrough
-# found two documentation gaps, both were fixed in README.md, neither in README_CN.md.
+# This round: entry 32 of _tested_limits carried a wrong number. It said the live pipeline skill
+# body in the backup repo is 59677 bytes, which was read off a file that turns out to be a build
+# artifact -- the shard merger overwrites it before the gate audits it, so no assertion has ever
+# read those bytes. The shards total 61181. The number was wrong inside an entry whose subject is
+# not trusting unmeasured numbers, which is why it gets corrected in place instead of appended to.
 on:
   workflow_dispatch:
     inputs:
       path:
-        description: 'file holding the checks'
+        description: 'payload script that does the edit'
         required: true
-        default: verify.py
+        default: .github/payloads/fix-limit-number.py
 
 permissions: {}
 
 jobs:
   patch:
-    name: assert the two READMEs agree on steps and load-bearing facts
+    name: correct the stale byte count in tested limit 32
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
-      - name: insert the parity check, update the gate doc, refresh two hashes
+      - name: fix the number and refresh this workflow's own hash
         id: patch
         continue-on-error: true
         shell: bash
@@ -42,7 +43,7 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p artifacts
-          python3 .github/payloads/readme-parity-patch.py 2>&1 | tee artifacts/readme-parity.log
+          python3 "$TARGET" 2>&1 | tee artifacts/fix-limit-number.log
       - name: run the real gate, and carry its output onto the same log
         id: gate
         if: steps.patch.outcome == 'success'
@@ -53,22 +54,21 @@ jobs:
           {
             set -eo pipefail
             python3 verify.py
-          } 2>&1 | tee -a artifacts/readme-parity.log
-          echo 'GATE OK' | tee -a artifacts/readme-parity.log
-      # No gh pr create. Actions is not permitted to open PRs in this org, and a step that always
-      # fails only teaches people to ignore red crosses. Pushing the branch is the success
-      # condition; opening the PR is a human step.
+          } 2>&1 | tee -a artifacts/fix-limit-number.log
+          echo 'GATE OK' | tee -a artifacts/fix-limit-number.log
+      # No gh pr create. Actions cannot open PRs in this org, and a step that always fails only
+      # teaches people to ignore red crosses. Pushing the branch is the success condition.
       - name: commit and push branch
         if: steps.patch.outcome == 'success' && steps.gate.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
-          branch="ci/readme-parity-$(date -u +%Y%m%d%H%M%S)"
+          branch="ci/fix-limit-number-$(date -u +%Y%m%d%H%M%S)"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git checkout -b "$branch"
-          git add "${{ inputs.path }}" docs/MINIMAL-GATE.md manifest.json
-          git commit -m "ci: assert the two READMEs agree on steps and load-bearing setup facts"
+          git add manifest.json .github/workflows/fix-consumer-set.yml "${{ inputs.path }}"
+          git commit -m "docs: correct the stale skill-body byte count in tested limit 32"
           git push origin "$branch"
           echo "branch pushed: $branch"
           echo "open a PR at ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/pull/new/$branch"
@@ -76,7 +76,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: report-readme-parity
+          name: report-fix-limit-number
           path: artifacts/
           if-no-files-found: error
       - name: fail if either step failed
