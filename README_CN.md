@@ -17,9 +17,9 @@
 1. 建三个仓库：一个共享回写仓、一个项目仓、一个离线备份仓。**按这个顺序建。**
 2. 共享回写仓**设为 public**，除非你有别的理由。私有的 reusable workflow 要额外配访问权限，别的仓才调得动。
 3. 在共享回写仓：Settings -> Actions -> General，把 **Workflow permissions** 设成 **Read and write permissions**，并勾上 **“Allow GitHub Actions to create and approve pull requests”**。
-4. 配好需要的 secrets 和 tokens。**跟仓令牌只有在仓库是私有时才需要。**
+4. 配好需要的 secrets 和 tokens。**跨仓令牌只有在仓库是私有时才需要。**
 5. 把共享 report workflow 搭好，**并给它自己配一条闸门**。一份没有闸门的共享 workflow，是一个会安静失效的单点。
-6. 在 ClickUp 里**安装**那个已有技能，不要重新创建一个。打开 Skills Hub（Home 侧栅 -> Skills，或 AI Hub -> Skills），点开技能，用右侧栅的 **+ Install**，或者列表里的 **Installed for** 那一栅。在对话里跟 Brain 说「create a skill」会新建一个空技能，那是另一件事，**也是新工作区里最常走错的一步**。
+6. 在 ClickUp 里**安装**那个已有技能，不要重新创建一个。打开 Skills Hub（Home 侧栏 -> Skills，或 AI Hub -> Skills），点开技能，用右侧栏的 **+ Install**，或者列表里的 **Installed for** 那一栏。在对话里跟 Brain 说「create a skill」会新建一个空技能，那是另一件事，**也是新工作区里最常走错的一步**。
 7. 用一条适合 Agent 的新对话提示词启动项目。
 8. 拿到第一条 green PR。
 9. 再拿到一次 deliberate red -> green 负向证明，**并确认那次 red 的报告也真的送达了**。
