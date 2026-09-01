@@ -175,7 +175,7 @@
     "copies": {
       "agents/drift-devon.md": {
         "live": "ClickUp Super Agent: Drift Devon",
-        "readback_at": "2026-08-31T08:40:00Z",
+        "readback_at": "2026-09-01T09:55:00Z",
         "max_readback_age_days": 3,
         "size_baseline_bytes": 7623,
         "_size_baseline_bytes": "7623 是 2026-08-27 从真身完整读回后的存储字节。旧值 6461 描述的是 8 月 26 日那次读回,当天晚些时候真身补回了整节「发现漂移就开 PR」，而抄本停在了补回之前。**这次是上调，不是下调**：高水位跟着真身长上去，否则「长过高水位而没抬 baseline 也红」那一侧会把一次诚实的同步判成假红。",
@@ -201,7 +201,7 @@
       },
       "agents/gate-audit-quinn.md": {
         "live": "ClickUp Super Agent: 闸门审计 Quinn",
-        "readback_at": "2026-08-31T08:40:00Z",
+        "readback_at": "2026-09-01T09:55:00Z",
         "max_readback_age_days": 3,
         "size_baseline_bytes": 8814,
         "_size_baseline_bytes": "8814 是 2026-08-28 从主干读回的存储字节真实尺寸（blob a6cbf677）。旧文案写的 8628 描述的是 2026-08-26 重构当天那一版，而字段值后来跟着真身涨到 8814，散文没跟上 —— 一次只有「散文声明的数字」和「字段真值」对不上的漂移，没有任何一条断言看得见它。旧值 30948 描述的是重构前那份 30KB 正文，而 prompt 已按「指令 / 档案」拆开：案例史搬进 docs/QUINN-FIELD-NOTES.md，prompt 只留铁律与判据。**这次下调是显式动作，理由写在这里** —— 高水位描述的对象变了，不是为了让断言变绿。",
