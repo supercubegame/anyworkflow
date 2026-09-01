@@ -19,11 +19,12 @@
 3. 在共享回写仓：Settings -> Actions -> General，把 **Workflow permissions** 设成 **Read and write permissions**，并勾上 **“Allow GitHub Actions to create and approve pull requests”**。
 4. 配好需要的 secrets 和 tokens。**跨仓令牌只有在仓库是私有时才需要。**
 5. 把共享 report workflow 搭好，**并给它自己配一条闸门**。一份没有闸门的共享 workflow，是一个会安静失效的单点。
-6. 用一条适合 Agent 的新对话提示词启动项目。
-7. 拿到第一条 green PR。
-8. 再拿到一次 deliberate red -> green 负向证明，**并确认那次 red 的报告也真的送达了**。
-9. 给真抄本记下 live readback 时间。
-10. 最后把整套东西回写进像本仓这样的离线备份仓。
+6. 在 ClickUp 里**安装**那个已有技能，不要重新创建一个。打开 Skills Hub（Home 侧栏 -> Skills，或 AI Hub -> Skills），点开技能，用右侧栏的 **+ Install**，或者列表里的 **Installed for** 那一栏。在对话里跟 Brain 说「create a skill」会新建一个空技能，那是另一件事，**也是新工作区里最常走错的一步**。
+7. 用一条适合 Agent 的新对话提示词启动项目。
+8. 拿到第一条 green PR。
+9. 再拿到一次 deliberate red -> green 负向证明，**并确认那次 red 的报告也真的送达了**。
+10. 给真抄本记下 live readback 时间。
+11. 最后把整套东西回写进像本仓这样的离线备份仓。
 
 如果你要走完整路径，直接看：
 - [`docs/BOOTSTRAP-FROM-ZERO.md`](./docs/BOOTSTRAP-FROM-ZERO.md)
@@ -31,6 +32,19 @@
 - [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
 想看一个真的从零开始的人怎么走完这一遍？[`docs/STRANGER-WALKTHROUGH-0001.md`](./docs/STRANGER-WALKTHROUGH-0001.md)
+
+---
+
+## 技能：安装、备份、恢复
+
+把这套方法带进对话里的东西就是技能，所以新工作区必须先装上它，下面那些示例提示词才会按本仓描述的样子工作。
+
+- Skills Hub 需要管理员先启用 **AI** 与 **Custom Skills** 两个 ClickApp。
+- **分享不等于安装。** 分享只是让别人能打开、能读；安装才会让 Brain 自动加载它。通常两件都要做。
+- **截至 2026-09-01，在 ClickUp 官方文档里没有找到技能的导出或导入功能。** 找到的内置项只有 Copy link、Copy ID、Duplicate、Description history 和 Sharing，没有任何一项能给你一个可以搬进另一个工作区的文件。
+- **但正文是读得回来的。** 每个技能都是自动生成的 Skills Space 里的一个任务，所以指令正文可以读回来存成文件。备份仓 `skills/` 目录就是这么填的。
+- **这条读回通道是内容级真抄本，不是字节级真抄本。** 2026-09-01 在一个技能上实测：仓里那份 3080 字节，读回来 3070 字节；把项目符号和空行归一化之后，两侧完全相同，各 3056 个字符。所以散文可信、原始字节不可信,这也是技能正文没法像仓库文件那样用 blob 自证的原因。
+- **恢复顺序：先子技能，后父技能。** 父技能正文里按名字引用子技能，而父子关系是人工重建的。正文要逐字粘贴，包括富文本残留，否则备份仓里登记的锚点会失配。
 
 ---
 
