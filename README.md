@@ -19,11 +19,12 @@ Start here if you want the fastest path from zero to a first working version:
 3. In the shared repo: Settings -> Actions -> General -> set **Workflow permissions** to **Read and write permissions**, and check **"Allow GitHub Actions to create and approve pull requests"**.
 4. Add the required secrets and tokens. A cross-repo token is only needed if the repos are private.
 5. Set up the shared report workflow, and give it its own gate. A shared workflow with no gate of its own is a single point of silent failure.
-6. Start a fresh project conversation with an agent-friendly prompt.
-7. Get one green PR.
-8. Get one deliberate red -> green proof, and confirm the report was delivered on the **red** run too.
-9. Capture live readback timestamps for the true copies.
-10. Back the whole thing up into a repo like this one.
+6. In ClickUp, **install** the existing Skill instead of creating a new one. Open the Skills Hub (Home Sidebar -> Skills, or AI Hub -> Skills), open the Skill, then use **+ Install** in its right sidebar, or the **Installed for** column in the list. Telling Brain "create a skill" in a chat builds a different, empty Skill, and that is the most common wrong turn in a fresh Workspace.
+7. Start a fresh project conversation with an agent-friendly prompt.
+8. Get one green PR.
+9. Get one deliberate red -> green proof, and confirm the report was delivered on the **red** run too.
+10. Capture live readback timestamps for the true copies.
+11. Back the whole thing up into a repo like this one.
 
 Need the full path? Go to:
 - [`docs/BOOTSTRAP-FROM-ZERO.md`](./docs/BOOTSTRAP-FROM-ZERO.md)
@@ -31,6 +32,19 @@ Need the full path? Go to:
 - [`docs/PROMPT-EXAMPLES.md`](./docs/PROMPT-EXAMPLES.md)
 
 Want to see it actually done by someone starting cold? [`docs/STRANGER-WALKTHROUGH-0001.md`](./docs/STRANGER-WALKTHROUGH-0001.md)
+
+---
+
+## Skills: Install, Back Up, Restore
+
+The Skill is what carries this method into a conversation, so a fresh Workspace needs it installed before the example prompts below behave the way this repo describes.
+
+- The Skills Hub needs the **AI** and **Custom Skills** ClickApps enabled by an admin.
+- **Sharing is not installing.** Sharing lets someone open a Skill and read it. Installing makes Brain load it automatically. You usually want both.
+- **No official export or import for Skills was found in ClickUp's own docs as of 2026-09-01.** The built-ins found are Copy link, Copy ID, Duplicate, Description history, and Sharing. None of them hand you a file you can carry into another Workspace.
+- **The bodies are still readable.** Each Skill is a task in the auto-created Skills Space, so its instruction text can be read back and stored as a file. That is how `skills/` in the backup repo gets filled.
+- **That readback is a content-level true copy, not a byte-level one.** Measured 2026-09-01 on one Skill: the stored file was 3080 bytes, the readback 3070. After normalizing bullet markers and blank lines, both sides were identical at 3056 characters. So the prose is trustworthy and the raw bytes are not, which is why a Skill body cannot be blob-proved the way a repo file can.
+- **Restore order: subskills first, then parents.** A parent Skill references its subskills by name, and the parent/child links are rebuilt by hand. Paste each body verbatim, rich-text residue included, or the anchors registered in the backup repo stop matching.
 
 ---
 
