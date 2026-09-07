@@ -1,0 +1,9 @@
+# Six-group closure, 2026-09-07
+
+Source-specific implementation and runtime evidence is in docs/ECOSYSTEM-AUDIT-20260907.md. The shared-preflight/copy/Agent snapshot closure was merged in [backup PR #154](https://github.com/supercubegame/clickup-brain-backup/pull/154), main commit 04cf11c6d87f9b11ba0623c13840361265ea9023. [meetnote #8](https://github.com/supercubegame/meetnote/pull/8) was merged with 109 fast tests, 60 live/ownership cases, 20 fast/alert policy cases and 15 recovery cases passing; actual API response remains subscription_required/unconfirmed.
+
+The final shared-consumer inventory describes 7 repositories and 18 calling workflow files, including backup's closure-maintenance workflow. It is a readback snapshot, not a guarantee that release/mirror/deployment paths ran. Five regression-only PRs were exercised without product changes: TodoX 103/103, jumpwow 32/32, image-grabber 43/43, crossyroad 134/134; flappycat 99/100, with its existing screenshot-replacement obligation overdue and the failure correctly delivered. That newly observed obligation is not silently waived or expanded into this fixed batch.
+
+Synthetic new shards were really pushed. Automatic PR creation was denied by the repository setting; the authorized GitHub connection created [test PR #153](https://github.com/supercubegame/clickup-brain-backup/pull/153) afterward. The two remote shard blob identities match independently generated source bytes. This is successful push and explicit handoff, not fully automatic CI PR creation. Do not merge the synthetic PR or the still-red acceptance infrastructure PR #152.
+
+Old PR #106 has been visibly marked superseded and its broad platform claim withdrawn; only the incident-specific user-reported deletion explanation is in the accepted ledger. Test/proposal PRs and branches remain open because destructive cleanup was excluded. No credentials, subscription settings or live Agent configuration changed.
