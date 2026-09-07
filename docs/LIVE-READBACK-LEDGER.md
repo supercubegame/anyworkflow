@@ -35,8 +35,8 @@
 - 文件：`agents/gate-audit-quinn.md`
 - 真身：ClickUp Super Agent `闸门审计 Quinn`
 - 读回方式：live agent 配置读回后导出
-- 最后读回时间（外部时间）：2026-08-17T08:26:47Z
-- 证据来源：归档提交 `74517f9`
+- 最后读回时间（外部时间）：2026-09-07T09:50:00Z
+- 证据来源：本次 ClickUp live `get_agent` 读回（2026-09-07 17:50 Asia/Shanghai）
 - 当前内容类型：**全文 prompt**
 - 说明：这是当前真 prompt 的离线副本，不是摘要
 
@@ -44,8 +44,8 @@
 - 文件：`agents/drift-devon.md`
 - 真身：ClickUp Super Agent `Drift Devon`
 - 读回方式：live agent 配置读回后导出
-- 最后读回时间（外部时间）：2026-08-17T08:27:05Z
-- 证据来源：归档提交 `76ad05c`
+- 最后读回时间（外部时间）：2026-09-07T09:50:00Z
+- 证据来源：本次 ClickUp live `get_agent` 读回（2026-09-07 17:50 Asia/Shanghai）
 - 当前内容类型：**全文 prompt**
 - 说明：这份副本已经包含“第二只眼，不是第二个喇叭”的收紧版
 
@@ -53,8 +53,8 @@
 - 文件：`vendor/ci-workflows/report.yml`
 - 真身：`supercubegame/ci-workflows/.github/workflows/report.yml@main`
 - 读回方式：GitHub 真文件读回后归档
-- 最后读回时间（外部时间）：2026-08-17T08:23:58Z
-- 证据来源：归档提交 `696b1bb`
+- 最后读回时间（外部时间）：2026-09-07T07:43:49Z
+- 证据来源：归档提交 `5dd80fa`
 - 当前内容类型：**全文 workflow 文件**
 - 说明：它只证明“那次读回时主干长这样”，证明不了远端主干现在还是这样
 
