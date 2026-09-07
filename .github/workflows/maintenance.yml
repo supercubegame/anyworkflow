@@ -1,0 +1,33 @@
+name: approved maintenance
+on:
+  push:
+    branches: ['maintenance/batch-20260907']
+  workflow_dispatch:
+permissions: {}
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Finish only the approved batch on its dedicated branch
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$BRANCH" = 'maintenance/batch-20260907'
+          python3 finish_batch.py
+          python3 verify.py
+          git add verify.py manifest.json docs/SHARED-WRITEBACK-CONSUMERS.md docs/ECOSYSTEM-AUDIT-20260907.md
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test: finalize permanent helper checks and ecosystem evidence'
+          git push origin HEAD:maintenance/batch-20260907
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: maintenance-evidence
+          path: artifacts/
