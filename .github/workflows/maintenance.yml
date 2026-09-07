@@ -1,7 +1,7 @@
 name: approved maintenance
 on:
   push:
-    branches: ['maintenance/pr-route-copy-20260907']
+    branches: ['fix/attest-pr-route-20260907']
   workflow_dispatch:
 permissions: {}
 jobs:
@@ -12,21 +12,21 @@ jobs:
       contents: write
     steps:
       - uses: actions/checkout@v5
-      - name: Sync only approved upstream copy on dedicated branch
+      - name: Repair only independent observer on dedicated branch
         env:
           BRANCH: ${{ github.ref_name }}
         run: |
           set -euo pipefail
-          test "$BRANCH" = 'maintenance/pr-route-copy-20260907'
+          test "$BRANCH" = 'fix/attest-pr-route-20260907'
           mkdir -p artifacts
-          python3 sync_pr_route_copy.py 2>&1 | tee artifacts/copy-sync.log
-          python3 verify.py 2>&1 | tee -a artifacts/copy-sync.log
-          git add manifest.json vendor/ci-workflows/report.yml
+          python3 repair_attest_route.py 2>&1 | tee artifacts/observer-repair.log
+          python3 verify.py 2>&1 | tee -a artifacts/observer-repair.log
+          git add manifest.json scripts/attest_delivery.py
           if git diff --cached --quiet; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git commit -m 'docs: record exact direct-PR report source and integrity'
-          git push origin HEAD:maintenance/pr-route-copy-20260907
+          git commit -m 'fix: independently resolve report destination using current PR identity'
+          git push origin HEAD:fix/attest-pr-route-20260907
       - uses: actions/upload-artifact@v7
         if: always()
         with:
