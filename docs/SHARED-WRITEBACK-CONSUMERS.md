@@ -7,7 +7,7 @@ Read 2026-08-31 from the real files: clickup-brain-backup calls it from six work
 Read 2026-08-31 again, hours later: anyworkflow itself calls the shared writeback from its own verify.yml, and this dict had never listed it -- the fourth error, and the one where the list omitted the repo it lives in. That entry is now derived from the real files on disk, so it is the only truly derived line here; the other six repos are still hand-written because deriving them needs a cross-repo token.
 
 - Repositories: **7**
-- Workflow files: **15**
+- Workflow files: **17**
 
 ## TodoX
 - `.github/workflows/verify.yml`
@@ -25,6 +25,8 @@ Read 2026-08-31 again, hours later: anyworkflow itself calls the shared writebac
 - `.github/workflows/fix-confusable.yml`
 - `.github/workflows/patch-heartbeat-gap.yml`
 - `.github/workflows/patch-yaml-shape.yml`
+- `.github/workflows/patch-tracked-ignored.yml`
+- `.github/workflows/split-acceptance.yml`
 
 ## crossyroad
 - `.github/workflows/verify.yml`

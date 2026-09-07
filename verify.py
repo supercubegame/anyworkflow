@@ -9,6 +9,33 @@ ROOT = Path(__file__).resolve().parent
 ARTIFACTS = ROOT / 'artifacts'
 manifest = json.loads((ROOT / 'manifest.json').read_text(encoding='utf-8'))
 
+def aware_readback(raw):
+    if not isinstance(raw, str):
+        raise ValueError('readback timestamp must be a string')
+    value = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError('readback timestamp must include a timezone')
+    return value
+
+
+def registered_files(root, directories):
+    found = set()
+    for directory in directories:
+        for f in sorted((root / directory).rglob('*')):
+            if '__pycache__' in f.parts or f.suffix == '.pyc':
+                continue
+            if f.is_symlink():
+                raise ValueError('symlink is not a registered content file: ' + str(f))
+            if f.is_file():
+                found.add(f.relative_to(root).as_posix())
+    return found
+
+
+def shared_calls(text):
+    # Only YAML mapping uses values, never comments or a quoted historical mention.
+    return re.findall(r'^\s*uses:\s*[\"\']?(supercubegame/ci-workflows/\.github/workflows/report\.yml@[^\s\"\']+)[\"\']?\s*(?:#.*)?$', text, re.M)
+
+
 checks = []
 
 # --------------------------------------------------------------------------
@@ -106,11 +133,7 @@ else:
               else '; '.join(bad))
 check('registered_files_byte_identical', '承重文件逐字节身份（blob 哈希）', ok, detail)
 
-on_disk = set()
-for d in REGISTERED_DIRS:
-    for f in sorted((ROOT / d).glob('*')):
-        if f.is_file():
-            on_disk.add(f'{d}/{f.name}')
+on_disk = registered_files(ROOT, REGISTERED_DIRS)
 declared_reg = {k for k in integrity if any(k.startswith(d + '/') for d in REGISTERED_DIRS)}
 missing_reg = sorted(on_disk - declared_reg)
 ghost_reg = sorted(declared_reg - on_disk)
@@ -200,7 +223,7 @@ for rel in sorted(copies):
         bad.append(f'{rel}：没有 readback_at —— 一份没有读回时间的抄本等于一张旧纸')
         continue
     try:
-        when = datetime.fromisoformat(raw.replace('Z', '+00:00'))
+        when = aware_readback(raw)
     except ValueError:
         bad.append(f'{rel}：readback_at 解析不了：{raw!r}')
         continue
@@ -349,7 +372,7 @@ check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期�
 CONSUMER_FILES = {
     'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml',
                              'fix-confusable.yml', 'patch-heartbeat-gap.yml',
-                             'patch-yaml-shape.yml'],
+                             'patch-yaml-shape.yml', 'patch-tracked-ignored.yml', 'split-acceptance.yml'],
     'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
     'flappycat': ['verify.yml'],
     'jumpwow': ['verify.yml'],
@@ -464,9 +487,9 @@ check('invariants_match_checks', 'manifest.invariants 与实际检查集合相�
 
 CONSUMER_SHARED_CALL = 'supercubegame/ci-workflows/.github/workflows/report.yml'
 SELF_WF_DIR = ROOT / '.github' / 'workflows'
-self_wf_files = sorted(f for f in SELF_WF_DIR.glob('*.yml') if f.is_file())
+self_wf_files = sorted(f for f in SELF_WF_DIR.iterdir() if f.is_file() and f.suffix in ('.yml', '.yaml'))
 self_derived = sorted(f.name for f in self_wf_files
-                      if CONSUMER_SHARED_CALL in f.read_text(encoding='utf-8', errors='replace'))
+                      if shared_calls(f.read_text(encoding='utf-8', errors='replace')))
 self_entry = CONSUMER_FILES.get('anyworkflow')
 self_listed = sorted(self_entry or [])
 if not self_wf_files:

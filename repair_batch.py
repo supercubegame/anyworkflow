@@ -119,7 +119,7 @@ p.write_text(a)
 ns = {'__name__': 'attest_test', '__file__': str(p)}; exec(compile(a,str(p),'exec'),ns)
 assert not ns['selftest']()
 # Production pagination implementation with fake pages, including the full-page boundary.
-ns['api'] = lambda route, token: [{'id': i} for i in range(100)] if 'page=1' in route else [{'id':100}]
+ns['api'] = lambda route, token: [{'id': i} for i in range(100)] if route.endswith('page=1') else [{'id':100}]
 assert len(ns['api_pages']('/comments','unused')) == 101
 
 # Read the exact public upstream revision, then verify Git's independent blob id.

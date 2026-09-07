@@ -68,13 +68,13 @@ def hits(comments, marker):
     out = []
     for c in comments:
         body = c.get('body') or ''
-        first = body.lstrip('\n').split('\n', 1)[0].strip()
-        if first == marker:
+        first = body.split('\n', 1)[0].removesuffix('\r')
+        if first == marker and c.get('user', {}).get('id') == 41898282 and c.get('user', {}).get('login') == 'github-actions[bot]':
             out.append(c)
     return out
 
 
-def evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments):
+def evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments, repo=None, run_attempt=None):
     """纯函数：给定两条通道的评论，判这次送达成不成立。"""
     problems = []
     notes = []
@@ -109,6 +109,10 @@ def evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments):
 
     if hit:
         body = hit[0].get('body') or ''
+        if repo is not None:
+            identity = f'<!-- ci-report-execution:{repo}:{sha}:{run_id}:{run_attempt} -->'
+            if identity not in body.splitlines()[:2]:
+                problems.append('Current repository/SHA/run/attempt identity is missing or stale')
         # 钉在本次运行上。这两条才是把「幂等写入的陈旧评论」和「这次真的送达了」
         # 分开的东西。
         if sha[:7] not in body:
@@ -157,11 +161,23 @@ def selftest():
     SELFTEST_CASE_COUNT = len(cases)
     broken = []
     for title, (prc, cc, _), want_min in cases:
+        for comment in prc + cc:
+            comment.setdefault('user', {'id': 41898282, 'login': 'github-actions[bot]'})
         problems, _ = evaluate(marker, sha, run_id, None, prc, cc)
         if want_min == 0 and problems:
             broken.append(f'{title} —— 却报了 {len(problems)} 条：{problems}')
         if want_min == 1 and not problems:
             broken.append(f'{title} —— 却一条都没报，这个检查器是装饰')
+    good[0]['user'] = {'id': 41898282, 'login': 'github-actions[bot]'}
+    identity = f'<!-- ci-report-execution:owner/repo:{sha}:{run_id}:2 -->'
+    current = dict(good[0], body=good_body.replace(marker+'\n', marker+'\n'+identity+'\n'))
+    if evaluate(marker, sha, run_id, None, [], [current], 'owner/repo', '2')[0]:
+        broken.append('current identity positive control failed')
+    for item, attempt in [(dict(current, user={'id': 1, 'login': 'github-actions[bot]'}), '2'),
+                          (current, '3'), (dict(current, body='\n'+current['body']), '2')]:
+        if not evaluate(marker, sha, run_id, None, [], [item], 'owner/repo', attempt)[0]:
+            broken.append('ownership/attempt/first-line negative was accepted')
+    SELFTEST_CASE_COUNT += 4
     return broken
 
 
@@ -175,6 +191,18 @@ def api(pathname, token):
     })
     with urllib.request.urlopen(req, timeout=30) as res:
         return json.loads(res.read().decode('utf-8'))
+
+
+def api_pages(pathname, token):
+    out = []
+    for page in range(1, 101):
+        batch = api(pathname + ('&' if '?' in pathname else '?') + f'per_page=100&page={page}', token)
+        if not isinstance(batch, list):
+            raise ValueError('paginated endpoint did not return a list')
+        out.extend(batch)
+        if len(batch) < 100:
+            return out
+    raise ValueError('pagination incomplete after 100 pages; not a clean result')
 
 
 def main():
@@ -202,12 +230,18 @@ def main():
     try:
         for attempt in range(1, POLL_ATTEMPTS + 1):
             attempts = attempt
-            pulls = api(f'/repos/{repo}/commits/{sha}/pulls', token)
-            open_pr = next((p for p in pulls if p.get('state') == 'open'), None)
+            pulls = api_pages(f'/repos/{repo}/commits/{sha}/pulls', token)
+            event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text()) if os.environ.get('GITHUB_EVENT_PATH') else {}
+            event_pr = event.get('pull_request')
+            head = event_pr['head']['sha'] if event_pr else sha
+            candidates = [p for p in pulls if p.get('state') == 'open' and p.get('head', {}).get('sha') == head and (not event_pr or p['number'] == event_pr['number'])]
+            if len(candidates) > 1:
+                raise ValueError('ambiguous current PR destination')
+            open_pr = candidates[0] if candidates else None
             pr_number = open_pr.get('number') if open_pr else None
-            pr_comments = api(f'/repos/{repo}/issues/{pr_number}/comments?per_page=100', token) if pr_number else []
-            commit_comments = api(f'/repos/{repo}/commits/{sha}/comments?per_page=100', token)
-            problems, notes = evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments)
+            pr_comments = api_pages(f'/repos/{repo}/issues/{pr_number}/comments', token) if pr_number else []
+            commit_comments = api_pages(f'/repos/{repo}/commits/{sha}/comments', token)
+            problems, notes = evaluate(marker, sha, run_id, pr_number, pr_comments, commit_comments, repo, os.environ.get('GITHUB_RUN_ATTEMPT'))
             if not problems:
                 break
             if attempt < POLL_ATTEMPTS:
