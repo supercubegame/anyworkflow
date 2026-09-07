@@ -395,7 +395,7 @@ check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期�
 CONSUMER_FILES = {
     'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml',
                              'fix-confusable.yml', 'patch-heartbeat-gap.yml',
-                             'patch-yaml-shape.yml', 'patch-tracked-ignored.yml', 'split-acceptance.yml', 'closure-maintenance.yml'],
+                             'patch-yaml-shape.yml', 'patch-tracked-ignored.yml', 'split-acceptance.yml', 'closure-maintenance.yml', 'split-write-acceptance.yml', 'split-write-selftest.yml'],
     'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
     'flappycat': ['verify.yml'],
     'jumpwow': ['verify.yml'],
