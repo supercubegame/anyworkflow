@@ -81,16 +81,17 @@
     "docs/VERIFY-EVIDENCE-0003.md": "87e13dff0c29fae4604aba561d7b01c777838236",
     "agents/drift-devon.md": "f2bee345da06bbfb0f5a007ddfdb0961fd44cbe5",
     "agents/gate-audit-quinn.md": "a6cbf6778256b1ba0e6a0a416153df11c690b636",
-    "vendor/ci-workflows/report.yml": "ccc30dbf35233ea80b8f0f664e3c608ae028fd42",
+    "vendor/ci-workflows/report.yml": "da3e4efd6bebfc3763a8eaefe05d88ec5a452131",
     ".github/workflows/append-tested-limit.yml": "0d3238887344668b5099cc23c1649162107a68ee",
     ".github/workflows/fix-consumer-set.yml": "9f718d9840ae35909a3e2f213d6af4b05c13a68f",
     ".github/workflows/refresh-integrity.yml": "5a5dfd7826929fba8b7c936c9b1019ccaadf38b6",
     ".github/workflows/register-workflow-dir.yml": "0912039055a17e7068b196ce765532e9d5bbac28",
     ".github/workflows/renew-readback.yml": "0e5e55841b8e1bc93e943001eaef6c361b6b2a2f",
-    ".github/workflows/maintenance.yml": "1b1a3baafbebefdfccc573ff84d38684e1d51f93",
+    ".github/workflows/maintenance.yml": "4c1e26a547f2b0defb1a5c17fe20a9e0b30eb6e1",
     "repair_batch.py": "12b1bb48fec10ee93fb688cc7623066fac7504f7",
     "docs/ECOSYSTEM-AUDIT-20260907.md": "178ff94699b40744c86cb2a9ff1dd5b113401282",
-    "finish_batch.py": "a9a3d008718f357c73a9845996ff9fa78092e155"
+    "finish_batch.py": "a9a3d008718f357c73a9845996ff9fa78092e155",
+    "sync_pr_route_copy.py": "f3fd78d0db4d9ac416e6bbc11f5ec466480d8ffb"
   },
   "_docs_integrity": "登记的是本地导出那一份的 git blob 哈希，CI 读存储字节重算并比较。它防的是一条已经发生过的坏：存储里的字被换成形近字，而字节长度不变，于是体积与关键字类检查全部看不见。改这些文件必须重算登记值，这是一组有意的摩擦。**而它守不住一件事**：抄本被掏空而哈希在同一次提交里跟着改了 —— 那一层由 true_copy_size_floor 守。",
   "docs_integrity_provenance": {
@@ -240,8 +241,8 @@
       },
       "vendor/ci-workflows/report.yml": {
         "live": "supercubegame/ci-workflows/.github/workflows/report.yml@main",
-        "readback_at": "2026-09-07T05:06:20.313232Z",
-        "size_baseline_bytes": 21709,
+        "readback_at": "2026-09-07T07:41:59.976048Z",
+        "size_baseline_bytes": 22790,
         "kind": "full-workflow",
         "required_sections": [
           "on:",
@@ -254,7 +255,7 @@
           "updateCommitComment",
           "esm-shim"
         ],
-        "source_commit": "7ff526bfad7d6d7e055875574ccf8f686c6f7e48"
+        "source_commit": "5ed2a58998025b0ff5d9625050945ac858ab3bda"
       }
     },
     "cross_copy": [
