@@ -178,6 +178,9 @@ def selftest():
         if not evaluate(marker, sha, run_id, None, [], [item], 'owner/repo', attempt)[0]:
             broken.append('ownership/attempt/first-line negative was accepted')
     SELFTEST_CASE_COUNT += 4
+    route_broken, route_count = route_selftest()
+    broken.extend(route_broken)
+    SELFTEST_CASE_COUNT += route_count
     return broken
 
 
@@ -205,6 +208,80 @@ def api_pages(pathname, token):
     raise ValueError('pagination incomplete after 100 pages; not a clean result')
 
 
+def select_delivery_pr(repo, sha, event, token, request=None, pages=None):
+    """Independent observer: use current PR state, never infer absence from merge association."""
+    request = request or api
+    pages = pages or api_pages
+    def valid_sha(value):
+        return isinstance(value, str) and len(value) == 40 and all(c in '0123456789abcdef' for c in value)
+    def valid_pr(value):
+        return (isinstance(value, dict) and type(value.get('number')) is int and value['number'] > 0
+                and value.get('state') in ('open', 'closed') and isinstance(value.get('head'), dict)
+                and valid_sha(value['head'].get('sha')) and isinstance(value.get('base'), dict)
+                and isinstance(value['base'].get('repo'), dict) and value['base']['repo'].get('full_name') == repo)
+    if not isinstance(event, dict) or not valid_sha(sha):
+        raise ValueError('invalid execution/event identity')
+    event_pr = event.get('pull_request')
+    if event_pr is not None:
+        if not valid_pr(event_pr):
+            raise ValueError('invalid event PR identity')
+        current = request(f"/repos/{repo}/pulls/{event_pr['number']}", token)
+        if not valid_pr(current) or current['number'] != event_pr['number']:
+            raise ValueError('invalid current PR identity')
+        if current['state'] == 'open' and current['head']['sha'] == event_pr['head']['sha']:
+            return current
+        return None  # Closed or newer head: do not demand an old report on the new PR state.
+    pulls = pages(f'/repos/{repo}/commits/{sha}/pulls', token)
+    if not isinstance(pulls, list) or any(not isinstance(item, dict) for item in pulls):
+        raise ValueError('invalid association response')
+    candidates = [item for item in pulls if valid_pr(item) and item['state'] == 'open' and item['head']['sha'] == sha]
+    if len(candidates) > 1:
+        raise ValueError('ambiguous current PR destination')
+    return candidates[0] if candidates else None
+
+
+def route_selftest():
+    import copy
+    repo, sha = 'owner/repo', 'a'*40
+    pr = {'number':9,'state':'open','head':{'sha':sha},'base':{'repo':{'full_name':repo}}}
+    def changed(**fields):
+        result = copy.deepcopy(pr); result.update(fields); return result
+    cases = [
+        ('event with empty association', pr, pr, [], 9),
+        ('event ignores unrelated association', pr, pr, [changed(number=10)], 9),
+        ('closed current PR', pr, changed(state='closed'), [], None),
+        ('newer head', pr, changed(head={'sha':'c'*40}), [], None),
+        ('wrong current number', pr, changed(number=10), [], 'error'),
+        ('wrong current repo', pr, changed(base={'repo':{'full_name':'other/repo'}}), [], 'error'),
+        ('invalid current state', pr, changed(state='unknown'), [], 'error'),
+        ('missing current head', pr, changed(head={}), [], 'error'),
+        ('boolean event number', changed(number=True), pr, [], 'error'),
+        ('non-PR association', None, pr, [pr], 9),
+        ('non-PR no association', None, pr, [], None),
+        ('non-PR ambiguity', None, pr, [pr, changed(number=10)], 'error'),
+        ('non-PR foreign repo ignored', None, pr, [changed(base={'repo':{'full_name':'other/repo'}})], None),
+        ('API error is not missing target', pr, 'api-error', [], 'error'),
+    ]
+    broken = []
+    for label, event_pr, current, associated, want in cases:
+        def request(route, token):
+            if current == 'api-error': raise ValueError('mock API failure')
+            if route != '/repos/owner/repo/pulls/9': raise AssertionError('wrong endpoint')
+            return copy.deepcopy(current)
+        def pages(route, token):
+            if event_pr is not None: raise AssertionError('PR event must not depend on association list')
+            return copy.deepcopy(associated)
+        try:
+            result = select_delivery_pr(repo, sha, {'pull_request':event_pr} if event_pr is not None else {}, 'mock', request, pages)
+            got = result['number'] if result else None
+        except ValueError:
+            got = 'error'
+        except Exception as err:
+            broken.append(label+': unexpected '+str(err)); continue
+        if got != want: broken.append(label+': expected '+str(want)+', got '+str(got))
+    return broken, len(cases)
+
+
 def main():
     broken = selftest()
     for b in broken:
@@ -230,14 +307,8 @@ def main():
     try:
         for attempt in range(1, POLL_ATTEMPTS + 1):
             attempts = attempt
-            pulls = api_pages(f'/repos/{repo}/commits/{sha}/pulls', token)
             event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text()) if os.environ.get('GITHUB_EVENT_PATH') else {}
-            event_pr = event.get('pull_request')
-            head = event_pr['head']['sha'] if event_pr else sha
-            candidates = [p for p in pulls if p.get('state') == 'open' and p.get('head', {}).get('sha') == head and (not event_pr or p['number'] == event_pr['number'])]
-            if len(candidates) > 1:
-                raise ValueError('ambiguous current PR destination')
-            open_pr = candidates[0] if candidates else None
+            open_pr = select_delivery_pr(repo, sha, event, token)
             pr_number = open_pr.get('number') if open_pr else None
             pr_comments = api_pages(f'/repos/{repo}/issues/{pr_number}/comments', token) if pr_number else []
             commit_comments = api_pages(f'/repos/{repo}/commits/{sha}/comments', token)
