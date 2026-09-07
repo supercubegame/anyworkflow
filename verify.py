@@ -36,6 +36,18 @@ def shared_calls(text):
     return re.findall(r'^ {4}uses:\s*[\"\']?(supercubegame/ci-workflows/\.github/workflows/report\.yml@[^\s\"\']+)[\"\']?\s*(?:#.*)?$', text, re.M)
 
 
+def inactive_policy_problems(text):
+    start = text.find('## meetnote：两种相反的失效')
+    end = text.find('## flappycat：', start)
+    if start < 0 or end < 0:
+        return ['meetnote policy section missing']
+    region = text[start:end]
+    tokens = ['当前适用策略（2026-09-07', 'run_live=true', '默认 false',
+              '超过 48 小时不按意外停机报警', '不要求恢复订阅', '不自动关闭',
+              '没有修改 live Agent', '历史判据']
+    return ['inactive monitoring policy missing: '+t for t in tokens if t not in region]
+
+
 def verifier_helpers_selftest():
     import tempfile
     bad = []
@@ -56,6 +68,14 @@ def verifier_helpers_selftest():
     if not shared_calls('    uses: '+call): bad.append('real job call missed')
     for text in ['#    uses: '+call, '          uses: '+call, '    run: echo '+call]:
         if shared_calls(text): bad.append('comment/run-block fake call accepted')
+    policy_text = (ROOT/'docs/QUINN-FIELD-NOTES.md').read_text(encoding='utf-8')
+    bad.extend(inactive_policy_problems(policy_text))
+    for token in ['run_live=true', '不要求恢复订阅', '超过 48 小时不按意外停机报警']:
+        mutant = policy_text.replace(token, '')
+        if mutant == policy_text or not inactive_policy_problems(mutant):
+            bad.append('inactive-policy deletion control failed: '+token)
+    if not inactive_policy_problems(''):
+        bad.append('empty policy accepted')
     return bad
 
 
