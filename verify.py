@@ -33,7 +33,30 @@ def registered_files(root, directories):
 
 def shared_calls(text):
     # Only YAML mapping uses values, never comments or a quoted historical mention.
-    return re.findall(r'^\s*uses:\s*[\"\']?(supercubegame/ci-workflows/\.github/workflows/report\.yml@[^\s\"\']+)[\"\']?\s*(?:#.*)?$', text, re.M)
+    return re.findall(r'^ {4}uses:\s*[\"\']?(supercubegame/ci-workflows/\.github/workflows/report\.yml@[^\s\"\']+)[\"\']?\s*(?:#.*)?$', text, re.M)
+
+
+def verifier_helpers_selftest():
+    import tempfile
+    bad = []
+    for raw in ['2026-09-07', '2026-09-07T00:00:00', None, 3, '2026-02-30T00:00:00Z']:
+        try:
+            aware_readback(raw)
+            bad.append('invalid timestamp accepted')
+        except ValueError:
+            pass
+    if aware_readback('2026-09-07T00:00:00Z').tzinfo is None:
+        bad.append('valid aware timestamp lost timezone')
+    with tempfile.TemporaryDirectory() as d:
+        root=Path(d); (root/'docs/nested').mkdir(parents=True)
+        (root/'docs/nested/f.md').write_text('x')
+        if registered_files(root,['docs']) != {'docs/nested/f.md'}:
+            bad.append('recursive registry missed nested file')
+    call='supercubegame/ci-workflows/.github/workflows/report.yml@main'
+    if not shared_calls('    uses: '+call): bad.append('real job call missed')
+    for text in ['#    uses: '+call, '          uses: '+call, '    run: echo '+call]:
+        if shared_calls(text): bad.append('comment/run-block fake call accepted')
+    return bad
 
 
 checks = []
@@ -112,7 +135,7 @@ def git_blob(raw):
 
 integrity = manifest.get('docs_integrity') or {}
 check('blob_hash_selftest', 'blob 哈希函数自证（git 空 blob 常量）',
-      git_blob(b'') == EMPTY_BLOB, f'空 blob = {git_blob(b"")}')
+      git_blob(b'') == EMPTY_BLOB and not verifier_helpers_selftest(), f'空 blob = {git_blob(b"")} | helper regressions={verifier_helpers_selftest()}')
 
 bad = []
 for rel in sorted(integrity):
@@ -372,7 +395,7 @@ check('cross_copy_consistency', '跨抄本一致性（不一致必须有带期�
 CONSUMER_FILES = {
     'clickup-brain-backup': ['split-apply.yml', 'split-dry-run.yml', 'verify.yml',
                              'fix-confusable.yml', 'patch-heartbeat-gap.yml',
-                             'patch-yaml-shape.yml', 'patch-tracked-ignored.yml', 'split-acceptance.yml'],
+                             'patch-yaml-shape.yml', 'patch-tracked-ignored.yml', 'split-acceptance.yml', 'closure-maintenance.yml'],
     'TodoX': ['verify.yml', 'release.yml', 'screenshots.yml', 'mirror.yml'],
     'flappycat': ['verify.yml'],
     'jumpwow': ['verify.yml'],
