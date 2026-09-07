@@ -1,0 +1,33 @@
+name: approved maintenance
+on:
+  push:
+    branches: ['maintenance/batch-20260907']
+  workflow_dispatch:
+permissions: {}
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - name: Apply only the approved maintenance patch on its dedicated branch
+        env:
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          test "$BRANCH" = 'maintenance/batch-20260907'
+          python3 repair_batch.py
+          python3 verify.py
+          git add verify.py scripts/attest_delivery.py manifest.json docs/SHARED-WRITEBACK-CONSUMERS.md vendor/ci-workflows/report.yml
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix: close approved verifier, delivery and copy-ledger gaps'
+          git push origin HEAD:maintenance/batch-20260907
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: maintenance-evidence
+          path: artifacts/
